@@ -1,0 +1,5 @@
+.wrapper { padding: 12px; border-bottom: 1px solid var(--color-border); }
+.select { width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 14px; margin-bottom: 8px; }
+.actions { display: flex; gap: 6px; }
+.btn { flex: 1; padding: 6px 0; font-size: 13px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); cursor: pointer; }
+.btn:hover { background: var(--color-bg); }

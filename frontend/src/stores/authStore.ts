@@ -1,55 +1,81 @@
 import { create } from 'zustand';
 import { apiClient } from '../api/client';
-import type { TokenResponse } from '../types/api';
+import { loginApi, registerApi } from '../api/auth';
 
 interface AuthState {
-  token: string | null;
   user: { username: string; role: string } | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  loadFromStorage: () => void;
+  restoreSession: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
   user: null,
+  token: null,
+  isAuthenticated: false,
+  isLoading: false,
 
-  login: async (username: string, password: string) => {
-    const data = await apiClient.post<TokenResponse>('/auth/login', {
-      username,
-      password,
-    });
-    apiClient.setToken(data.access_token);
-    localStorage.setItem('ling_token', data.access_token);
-    localStorage.setItem('ling_user', JSON.stringify({ username: data.username, role: data.role }));
-    set({ token: data.access_token, user: { username: data.username, role: data.role } });
+  login: async (username, password) => {
+    set({ isLoading: true });
+    try {
+      const data = await loginApi(username, password);
+      apiClient.setToken(data.access_token);
+      localStorage.setItem('ling_token', data.access_token);
+      localStorage.setItem('ling_user', JSON.stringify({ username: data.username, role: data.role }));
+      set({
+        user: { username: data.username, role: data.role },
+        token: data.access_token,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } catch (e) {
+      set({ isLoading: false });
+      throw e;
+    }
   },
 
-  register: async (username: string, password: string) => {
-    const data = await apiClient.post<TokenResponse>('/auth/register', {
-      username,
-      password,
-    });
-    apiClient.setToken(data.access_token);
-    localStorage.setItem('ling_token', data.access_token);
-    localStorage.setItem('ling_user', JSON.stringify({ username: data.username, role: data.role }));
-    set({ token: data.access_token, user: { username: data.username, role: data.role } });
+  register: async (username, password) => {
+    set({ isLoading: true });
+    try {
+      const data = await registerApi(username, password);
+      apiClient.setToken(data.access_token);
+      localStorage.setItem('ling_token', data.access_token);
+      localStorage.setItem('ling_user', JSON.stringify({ username: data.username, role: data.role }));
+      set({
+        user: { username: data.username, role: data.role },
+        token: data.access_token,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } catch (e) {
+      set({ isLoading: false });
+      throw e;
+    }
   },
 
   logout: () => {
     apiClient.setToken(null);
     localStorage.removeItem('ling_token');
     localStorage.removeItem('ling_user');
-    set({ token: null, user: null });
+    set({ user: null, token: null, isAuthenticated: false });
   },
 
-  loadFromStorage: () => {
+  restoreSession: () => {
     const token = localStorage.getItem('ling_token');
     const userStr = localStorage.getItem('ling_user');
     if (token && userStr) {
-      apiClient.setToken(token);
-      set({ token, user: JSON.parse(userStr) });
+      try {
+        const user = JSON.parse(userStr);
+        apiClient.setToken(token);
+        set({ user, token, isAuthenticated: true });
+      } catch {
+        localStorage.removeItem('ling_token');
+        localStorage.removeItem('ling_user');
+      }
     }
   },
 }));
