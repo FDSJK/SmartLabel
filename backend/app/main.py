@@ -12,6 +12,22 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.WORK_DIR, exist_ok=True)
     init_db(settings.DATABASE_URL)
     Base.metadata.create_all(bind=get_engine())
+
+    from sqlalchemy.orm import Session as DBSession
+    from app.core.security import hash_password
+    from app.models.user import User
+
+    with DBSession(get_engine()) as db:
+        if db.query(User).filter(User.role == "admin").count() == 0:
+            admin = User(
+                username="admin",
+                password_hash=hash_password("admin"),
+                role="admin",
+                is_active=True,
+            )
+            db.add(admin)
+            db.commit()
+
     yield
 
 
