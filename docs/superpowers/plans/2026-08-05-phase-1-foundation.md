@@ -172,6 +172,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "alembic>=1.13.0",
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
     "bcrypt>=4.0.0",
     "pyjwt>=2.8.0",
     "pillow>=10.0.0",
@@ -213,7 +214,7 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
-        return f"sqlite+aiosqlite:///{self.WORK_DIR}/metadata.db"
+        return f"sqlite:///{self.WORK_DIR}/metadata.db"
 
     model_config = {"env_prefix": "LING_", "extra": "ignore"}
 
