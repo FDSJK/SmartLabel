@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { fetchBatches, scanBatches, createBatch, uploadImages } from '../api/batches';
+import { fetchBatches, scanBatches, createBatch, uploadImages, deleteBatch } from '../api/batches';
 import { fetchImages } from '../api/images';
 import type { Batch, ImageInfo } from '../types/api';
 
@@ -12,6 +12,9 @@ interface BatchState {
   selectBatch: (batchId: number) => Promise<void>;
   doScan: () => Promise<{ added: number; skipped: number }>;
   doCreateAndUpload: (name: string, files: File[]) => Promise<void>;
+  doUploadToBatch: (batchId: number, files: File[]) => Promise<void>;
+  doDeleteBatch: (batchId: number) => Promise<void>;
+  deselectBatch: () => void;
 }
 
 export const useBatchStore = create<BatchState>((set, get) => ({
@@ -35,6 +38,10 @@ export const useBatchStore = create<BatchState>((set, get) => ({
     }
   },
 
+  deselectBatch: () => {
+    set({ currentBatchId: null, images: [] });
+  },
+
   doScan: async () => {
     const result = await scanBatches();
     await get().loadBatches();
@@ -46,5 +53,20 @@ export const useBatchStore = create<BatchState>((set, get) => ({
     await uploadImages(batch.id, files);
     await get().loadBatches();
     await get().selectBatch(batch.id);
+  },
+
+  doUploadToBatch: async (batchId, files) => {
+    await uploadImages(batchId, files);
+    await get().loadBatches();
+    await get().selectBatch(batchId);
+  },
+
+  doDeleteBatch: async (batchId: number) => {
+    await deleteBatch(batchId);
+    const state = get();
+    if (state.currentBatchId === batchId) {
+      set({ currentBatchId: null, images: [] });
+    }
+    await get().loadBatches();
   },
 }));

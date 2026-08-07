@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBatchStore } from '../../stores/batchStore';
+import { useAuthStore } from '../../stores/authStore';
+import { ApiError } from '../../api/client';
 import styles from './BatchSelector.module.css';
 
 export default function BatchSelector() {
-  const { batches, currentBatchId, loadBatches, selectBatch, doScan, doCreateAndUpload, loading } = useBatchStore();
+  const { batches, currentBatchId, loadBatches, selectBatch, deselectBatch, doScan, doCreateAndUpload, doUploadToBatch, doDeleteBatch, loading } = useBatchStore();
+  const { user } = useAuthStore();
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const uploadTarget = useRef<'new' | 'existing'>('new');
   const batchNameRef = useRef<string>('');
 
   useEffect(() => { loadBatches(); }, [loadBatches]);
@@ -16,19 +20,29 @@ export default function BatchSelector() {
   };
 
   const handleUploadClick = () => {
-    const name = prompt('输入批次名称：');
-    if (!name) return;
-    batchNameRef.current = name;
+    if (currentBatchId) {
+      // 上传到已选中批次
+      uploadTarget.current = 'existing';
+    } else {
+      // 新建批次
+      const name = prompt('输入批次名称：');
+      if (!name) return;
+      batchNameRef.current = name;
+      uploadTarget.current = 'new';
+    }
     fileRef.current?.click();
   };
 
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const name = batchNameRef.current;
-    if (!name || files.length === 0) return;
+    if (files.length === 0) return;
     setUploading(true);
     try {
-      await doCreateAndUpload(name, files);
+      if (uploadTarget.current === 'existing' && currentBatchId) {
+        await doUploadToBatch(currentBatchId, files);
+      } else if (uploadTarget.current === 'new' && batchNameRef.current) {
+        await doCreateAndUpload(batchNameRef.current, files);
+      }
     } catch {
       alert('上传失败');
     }
@@ -36,12 +50,24 @@ export default function BatchSelector() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
+  const handleDelete = async () => {
+    if (!currentBatchId) return;
+    const batch = batches.find(b => b.id === currentBatchId);
+    if (!batch) return;
+    if (!confirm(`确认删除批次「${batch.name}」？\n未标注的批次将被删除，已标注的批次无法删除。`)) return;
+    try {
+      await doDeleteBatch(currentBatchId);
+    } catch (err) {
+      alert(err instanceof ApiError ? err.detail : '删除失败');
+    }
+  };
+
   return (
     <div className={styles.wrapper}>
       <select
         className={styles.select}
         value={currentBatchId ?? ''}
-        onChange={(e) => { const id = Number(e.target.value); if (id) selectBatch(id); }}
+        onChange={(e) => { const id = Number(e.target.value); if (id) selectBatch(id); else deselectBatch(); }}
         disabled={loading}
       >
         <option value="">-- 选择批次 --</option>
@@ -52,8 +78,11 @@ export default function BatchSelector() {
       <div className={styles.actions}>
         <button className={styles.btn} onClick={handleScan} disabled={loading}>扫描</button>
         <button className={styles.btn} onClick={handleUploadClick} disabled={uploading}>
-          {uploading ? '上传中...' : '上传'}
+          {uploading ? '上传中...' : currentBatchId ? '补充上传' : '新建上传'}
         </button>
+        {user?.role === 'admin' && currentBatchId && (
+          <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleDelete}>删除批次</button>
+        )}
         <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/tiff" multiple
           onChange={handleFilesSelected} hidden />
       </div>

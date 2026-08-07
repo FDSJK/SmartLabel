@@ -7,6 +7,7 @@ from app.core.db import get_db
 import app.core.config as _config
 from app.models.batch import Batch
 from app.models.image import Image
+from app.models.setting import Setting
 from app.models.user import User
 from app.schemas.batch import BatchCreate, BatchResponse
 from app.schemas.image import ImageResponse
@@ -14,6 +15,14 @@ from app.api.deps import require_admin, get_current_user
 from app.services.scanner import scan_batches
 
 router = APIRouter()
+
+
+def _get_work_dir(db: Session) -> str:
+    """Read WORK_DIR from the database settings table, fall back to config default."""
+    row = db.query(Setting).filter(Setting.key == "WORK_DIR").first()
+    if row and row.value.strip():
+        return row.value.strip()
+    return _config.settings.WORK_DIR
 
 
 def _batch_to_response(b: Batch, db: Session) -> BatchResponse:
@@ -76,12 +85,43 @@ def create_batch(
     return _batch_to_response(batch, db)
 
 
+@router.delete("/batches/{batch_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_batch(
+    batch_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    batch = db.query(Batch).filter(Batch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+
+    # 检查是否有已标注的图片
+    annotated = db.query(Image).filter(
+        Image.batch_id == batch_id,
+        Image.annotation_rev > 0,
+    ).count()
+    if annotated > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Batch has {annotated} annotated image(s), cannot delete",
+        )
+
+    # 删除文件系统中的批次目录
+    work_dir = _get_work_dir(db)
+    batch_dir = os.path.join(work_dir, "batches", batch.name)
+    if os.path.isdir(batch_dir):
+        shutil.rmtree(batch_dir)
+
+    db.delete(batch)
+    db.commit()
+
+
 @router.post("/batches/scan")
 def trigger_scan(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    result = scan_batches(_config.settings.WORK_DIR, db, created_by=admin.id)
+    result = scan_batches(_get_work_dir(db), db, created_by=admin.id)
     return result
 
 
@@ -96,7 +136,8 @@ async def upload_images(
     if not batch:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
 
-    batch_dir = os.path.join(_config.settings.WORK_DIR, "batches", batch.name)
+    work_dir = _get_work_dir(db)
+    batch_dir = os.path.join(work_dir, "batches", batch.name)
     images_dir = os.path.join(batch_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
 
@@ -121,7 +162,7 @@ async def upload_images(
             shutil.copyfileobj(f.file, buf)
 
         info = get_image_info(dest_path)
-        src_rel = os.path.relpath(dest_path, start=_config.settings.WORK_DIR)
+        src_rel = os.path.relpath(dest_path, start=work_dir)
         work_rel = None
         if info["channels"] > 3:
             cache_dir = os.path.join(batch_dir, "cache", "rgb")

@@ -92,6 +92,22 @@ class TestDeleteLabel:
         assert resp.status_code == 404
 
 
+class TestClearLabels:
+    def test_clear_all_labels(self, client: TestClient):
+        token = _admin_token(client)
+        client.post("/api/labels", json={"name": "a"}, headers=_auth(token))
+        client.post("/api/labels", json={"name": "b"}, headers=_auth(token))
+        resp = client.delete("/api/labels", headers=_auth(token))
+        assert resp.status_code == 204
+        list_resp = client.get("/api/labels", headers=_auth(token))
+        assert list_resp.json() == []
+
+    def test_clear_labels_requires_admin(self, client: TestClient):
+        token = _annotator_token(client)
+        resp = client.delete("/api/labels", headers=_auth(token))
+        assert resp.status_code == 403
+
+
 class TestImportTxt:
     def test_import_labels_from_txt(self, client: TestClient):
         token = _admin_token(client)

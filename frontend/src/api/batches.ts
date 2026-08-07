@@ -16,3 +16,7 @@ export async function scanBatches(): Promise<{ added: number; skipped: number; e
 export async function uploadImages(batchId: number, files: File[]): Promise<ImageInfo[]> {
   return apiClient.uploadFiles<ImageInfo[]>(`/batches/${batchId}/upload`, files);
 }
+
+export async function deleteBatch(batchId: number): Promise<void> {
+  return apiClient.delete(`/batches/${batchId}`);
+}

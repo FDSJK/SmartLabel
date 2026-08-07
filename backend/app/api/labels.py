@@ -1,3 +1,5 @@
+import colorsys
+import random
 import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -14,10 +16,26 @@ DEFAULT_PALETTE = [
     "#00cccc", "#ff66aa", "#aacc00", "#886644", "#ff8844",
 ]
 
+# Golden angle in radians — produces well-distributed hues
+_GOLDEN_ANGLE = 3.141592653589793 * 0.618033988749895
+_hue_offset = random.random()  # random starting hue per process
+
+
+def _vibrant_color(index: int) -> str:
+    """Generate a vibrant, evenly-distributed color using the golden ratio method."""
+    hue = (_hue_offset + index * _GOLDEN_ANGLE) % 1.0
+    r, g, b = colorsys.hls_to_rgb(h=hue, l=0.55, s=0.75)
+    return "#{:02x}{:02x}{:02x}".format(int(r * 255), int(g * 255), int(b * 255))
+
 
 def _next_color(db: Session) -> str:
     used = {label.color for label in db.query(Label).all()}
     for c in DEFAULT_PALETTE:
+        if c not in used:
+            return c
+    # Palette exhausted — generate vibrant colors via golden-ratio hue distribution
+    for i in range(1000):
+        c = _vibrant_color(i)
         if c not in used:
             return c
     return "#808080"
@@ -76,6 +94,15 @@ def update_label(
     db.commit()
     db.refresh(label)
     return label
+
+
+@router.delete("/labels", status_code=status.HTTP_204_NO_CONTENT)
+def clear_labels(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    db.query(Label).delete()
+    db.commit()
 
 
 @router.delete("/labels/{label_id}", status_code=status.HTTP_204_NO_CONTENT)

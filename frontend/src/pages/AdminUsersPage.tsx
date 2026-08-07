@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchUsers, createUser, updateUser } from '../api/users';
+import { fetchUsers, createUser, updateUser, deleteUser } from '../api/users';
 import type { User } from '../types/api';
 import { ApiError } from '../api/client';
 import styles from './AdminUsersPage.module.css';
@@ -42,6 +42,16 @@ export default function AdminUsersPage() {
     } catch { setError('密码重置失败'); }
   };
 
+  const handleDelete = async (user: User) => {
+    if (!confirm(`确认删除用户「${user.username}」？此操作不可撤销。`)) return;
+    try {
+      await deleteUser(user.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : '删除失败');
+    }
+  };
+
   return (
     <div className={styles.page}>
       <h2 className={styles.heading}>用户管理</h2>
@@ -74,6 +84,7 @@ export default function AdminUsersPage() {
                   {u.is_active ? '禁用' : '启用'}
                 </button>
                 <button className={styles.btnSmall} onClick={() => handleResetPw(u)}>改密</button>
+                <button className={`${styles.btnSmall} ${styles.btnDanger}`} onClick={() => handleDelete(u)}>删除</button>
               </td>
             </tr>
           ))}

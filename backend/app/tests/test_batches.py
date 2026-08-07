@@ -68,3 +68,26 @@ class TestGetImage:
         token = _admin_token(client)
         resp = client.get("/api/images/99999", headers=_auth(token))
         assert resp.status_code == 404
+
+
+class TestDeleteBatch:
+    def test_delete_empty_batch(self, client: TestClient):
+        token = _admin_token(client)
+        create = client.post("/api/batches", json={"name": "to-delete"}, headers=_auth(token))
+        batch_id = create.json()["id"]
+        resp = client.delete(f"/api/batches/{batch_id}", headers=_auth(token))
+        assert resp.status_code == 204
+        # Verify gone
+        list_resp = client.get("/api/batches", headers=_auth(token))
+        assert all(b["id"] != batch_id for b in list_resp.json())
+
+    def test_delete_batch_404(self, client: TestClient):
+        token = _admin_token(client)
+        resp = client.delete("/api/batches/99999", headers=_auth(token))
+        assert resp.status_code == 404
+
+    def test_delete_batch_requires_admin(self, client: TestClient):
+        resp = client.post("/api/auth/register", json={"username": "ann_del", "password": "pass1234"})
+        token = resp.json()["access_token"]
+        resp = client.delete("/api/batches/1", headers=_auth(token))
+        assert resp.status_code == 403

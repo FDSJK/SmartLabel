@@ -17,6 +17,10 @@ export async function deleteLabel(id: number): Promise<void> {
   await apiClient.delete(`/labels/${id}`);
 }
 
+export async function clearLabels(): Promise<void> {
+  await apiClient.delete('/labels');
+}
+
 export async function importLabelsTxt(content: string): Promise<Label[]> {
   return apiClient.post<Label[]>('/labels/import-txt', { content });
 }

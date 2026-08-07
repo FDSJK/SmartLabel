@@ -12,3 +12,7 @@ export async function createUser(data: { username: string; password: string; rol
 export async function updateUser(id: number, data: { is_active?: boolean; password?: string; role?: string }): Promise<User> {
   return apiClient.put<User>(`/users/${id}`, data);
 }
+
+export async function deleteUser(id: number): Promise<void> {
+  return apiClient.delete(`/users/${id}`);
+}

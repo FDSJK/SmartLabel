@@ -4,7 +4,8 @@
 .form { display: flex; gap: 8px; margin-bottom: 16px; }
 .input { padding: 8px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 14px; flex: 1; }
 .btn { padding: 8px 16px; background: var(--color-primary); color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; }
-.importRow { margin-bottom: 20px; }
+.importRow { margin-bottom: 20px; display: flex; gap: 8px; }
+.btnClearAll { background: var(--color-danger); }
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .table th, .table td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); text-align: left; }
 .table th { color: var(--color-text-muted); font-weight: 600; }

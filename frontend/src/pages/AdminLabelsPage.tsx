@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { fetchLabels, createLabel, updateLabel, deleteLabel, importLabelsTxt } from '../api/labels';
+import { fetchLabels, createLabel, updateLabel, deleteLabel, clearLabels, importLabelsTxt } from '../api/labels';
 import type { Label } from '../types/api';
 import { ApiError } from '../api/client';
 import ColorPicker from '../components/common/ColorPicker';
@@ -53,6 +53,16 @@ export default function AdminLabelsPage() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
+  const handleClearAll = async () => {
+    if (!confirm('确定清空所有标签吗？此操作不可撤销！')) return;
+    try {
+      await clearLabels();
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : '清空失败');
+    }
+  };
+
   return (
     <div className={styles.page}>
       <h2 className={styles.heading}>标签管理</h2>
@@ -64,6 +74,7 @@ export default function AdminLabelsPage() {
       </form>
       <div className={styles.importRow}>
         <button className={styles.btn} onClick={() => fileRef.current?.click()}>从 txt 文件导入</button>
+        <button className={`${styles.btn} ${styles.btnClearAll}`} onClick={handleClearAll}>清空所有标签</button>
         <input ref={fileRef} type="file" accept=".txt" onChange={handleFileImport} hidden />
       </div>
       <table className={styles.table}>

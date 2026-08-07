@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import hash_password
 from app.models.user import User
+from app.models.image import Image
+from app.models.batch import Batch
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.api.deps import require_admin
 
@@ -59,3 +61,34 @@ def update_user(
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # 不允许删除自己
+    if user.id == admin.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete yourself")
+
+    # 目标用户是管理员时，仅原始 admin 账号可以删除
+    if user.role == "admin":
+        if admin.username != "admin":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only the primary admin can delete admin users")
+        admin_count = db.query(User).filter(User.role == "admin").count()
+        if admin_count <= 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete the last admin")
+
+    # 清除外键引用
+    db.query(Image).filter(Image.locked_by == user_id).update({"locked_by": None})
+    db.query(Batch).filter(Batch.created_by == user_id).update({"created_by": None})
+
+    db.delete(user)
+    db.commit()
+
