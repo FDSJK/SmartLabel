@@ -50,8 +50,8 @@ def _make_mask(tmp_work_dir, batch="b1", label="cat", fname="a.png", size=64, va
 def test_import_writes_json_and_creates_label(client, tmp_work_dir):
     token = _admin_token(client)
     _make_image(tmp_work_dir)
-    _make_mask(tmp_work_dir)
     client.post("/api/batches/scan", headers=_auth(token))
+    _make_mask(tmp_work_dir)
 
     from app.models.batch import Batch
     db = _session()

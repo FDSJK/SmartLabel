@@ -13,6 +13,7 @@ from app.schemas.batch import BatchCreate, BatchResponse
 from app.schemas.image import ImageResponse
 from app.api.deps import require_admin, get_current_user
 from app.services.scanner import scan_batches
+from app.services.mask_import import import_batch_masks, import_all_batches
 
 router = APIRouter()
 
@@ -121,7 +122,12 @@ def trigger_scan(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    result = scan_batches(_get_work_dir(db), db, created_by=admin.id)
+    work_dir = _get_work_dir(db)
+    result = scan_batches(work_dir, db, created_by=admin.id)
+    imp = import_all_batches(work_dir, db, username=admin.username)
+    result["imported"] = imp["imported"]
+    result["created_labels"] = list(dict.fromkeys(imp["created_labels"]))
+    result["errors"].extend(imp["errors"])
     return result
 
 
@@ -195,6 +201,22 @@ def list_images(
 ):
     images = db.query(Image).filter(Image.batch_id == batch_id).order_by(Image.file_name).all()
     return [_image_to_response(img, db) for img in images]
+
+
+@router.post("/batches/{batch_id}/import-masks")
+def import_masks(
+    batch_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    batch = db.query(Batch).filter(Batch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+
+    work_dir = _get_work_dir(db)
+    r = import_batch_masks(work_dir, batch, db, username=admin.username)
+    r["created_labels"] = list(dict.fromkeys(r["created_labels"]))
+    return r
 
 
 @router.get("/images/{image_id}", response_model=ImageResponse)
