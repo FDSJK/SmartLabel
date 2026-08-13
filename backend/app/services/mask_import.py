@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 import cv2
@@ -123,7 +124,12 @@ def import_batch_masks(work_dir: str, batch: Batch, db: Session, username: str =
 
     images = db.query(Image).filter(Image.batch_id == batch.id).all()
     for image in images:
-        data = read_annotation(work_dir, batch.name, image.file_name)
+        try:
+            data = read_annotation(work_dir, batch.name, image.file_name)
+        except (json.JSONDecodeError, OSError) as e:
+            result["errors"].append({"file": image.file_name, "error": f"corrupt annotation: {e}"})
+            result["skipped"] += 1
+            continue
         if data and data.get("shapes"):
             result["skipped"] += 1
             continue

@@ -68,3 +68,19 @@ def test_import_masks_endpoint(client, tmp_work_dir):
     resp2 = client.post(f"/api/batches/{b2['id']}/import-masks", headers=_auth(token))
     assert resp2.json()["imported"] == 0
     assert resp2.json()["skipped"] == 1
+
+
+def test_scan_survives_corrupt_annotation(client, tmp_work_dir):
+    token = _admin_token(client)
+    _make_image(tmp_work_dir, "b3")
+    _make_mask(tmp_work_dir, "b3")
+    # 预置一个损坏的 sidecar JSON
+    annot_dir = os.path.join(tmp_work_dir, "batches", "b3", "annotations")
+    os.makedirs(annot_dir)
+    with open(os.path.join(annot_dir, "a.json"), "w") as f:
+        f.write("{ not valid json")
+    resp = client.post("/api/batches/scan", headers=_auth(token))
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["imported"] == 0
+    assert any("corrupt annotation" in e["error"] for e in data["errors"])
