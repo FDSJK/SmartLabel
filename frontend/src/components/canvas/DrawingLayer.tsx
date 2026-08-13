@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { Circle, Line, Rect, Group } from 'react-konva';
 import { useEditorStore } from '../../stores/editorStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -396,20 +396,13 @@ export default function DrawingLayer() {
     ? (shapes.find(s => s.id === selectedShapeId) ?? null)
     : null;
 
+  // Highlight the selected shape in its own label color, not a fixed cyan
+  const selectedShapeColor = selectedShape
+    ? (labels.find(l => l.name === selectedShape.label)?.color || '#00e5ff')
+    : '#00e5ff';
+
   const imgW = currentImage?.width || 4096;
   const imgH = currentImage?.height || 4096;
-
-  // DEBUG: log selection state in add/cut mode
-  useEffect(() => {
-    if (isAdding || isCutting) {
-      console.log('[DrawingLayer] bool-op mode', {
-        currentTool,
-        selectedShapeId,
-        hasSelectedShape: !!selectedShape,
-        shapeCount: shapes.length,
-      });
-    }
-  }, [currentTool, selectedShapeId, selectedShape, isAdding, isCutting, shapes.length]);
 
   return (
     <>
@@ -480,12 +473,12 @@ export default function DrawingLayer() {
         <Line
           points={selectedShape.points.flat()}
           closed
-          stroke="#00e5ff"
-          strokeWidth={3.5}
+          stroke={selectedShapeColor}
+          strokeWidth={4}
           dash={[6, 3]}
           lineJoin="round"
-          shadowColor="#00e5ff"
-          shadowBlur={8}
+          shadowColor={selectedShapeColor}
+          shadowBlur={10}
           listening={false}
         />
       )}
@@ -498,7 +491,7 @@ export default function DrawingLayer() {
           return (
             <Circle key={`v-${i}`} x={x} y={y}
               radius={hovered ? VERTEX_RADIUS + 2 : VERTEX_RADIUS}
-              fill="white" stroke="#00bcd4"
+              fill="white" stroke={selectedShapeColor}
               strokeWidth={hovered ? 3 : 2}
               listening={false} />
           );

@@ -95,17 +95,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   redoStack: [],
   isDirty: false,
 
-  setTool: (tool) => {
-    console.log('[editorStore] setTool', tool, '| selectedShapeId =', get().selectedShapeId);
-    set({ currentTool: tool });
-  },
+  setTool: (tool) => set({ currentTool: tool }),
 
   setSelectedLabel: (label) => set({ selectedLabel: label }),
 
-  selectShape: (id) => {
-    console.log('[editorStore] selectShape', id, '| prev =', get().selectedShapeId);
-    set({ selectedShapeId: id });
-  },
+  selectShape: (id) => set({ selectedShapeId: id }),
 
   // --- Drawing ---
   startDrawing: () => set({ drawingPoints: [] }),
