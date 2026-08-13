@@ -12,6 +12,7 @@ dependencies = [
     "pyjwt>=2.8.0",
     "pillow>=10.0.0",
     "numpy>=1.26.0",
+    "opencv-python-headless>=4.9.0",
     "onnxruntime>=1.18.0",
     "python-multipart>=0.0.9",
     "aiofiles>=24.0.0",
