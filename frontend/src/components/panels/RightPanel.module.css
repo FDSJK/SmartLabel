@@ -1,0 +1,193 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.section {
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.sectionGrow {
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin: 0 0 8px;
+  flex-shrink: 0;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab {
+  flex: 1;
+  padding: 6px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.tab:hover {
+  color: var(--color-text);
+}
+
+.tabActive {
+  color: var(--color-primary, #00bcd4);
+  border-bottom-color: var(--color-primary, #00bcd4);
+  font-weight: 600;
+}
+
+/* Tool buttons */
+.toolGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toolBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.toolBtn:hover {
+  background: var(--color-hover, rgba(255, 255, 255, 0.05));
+}
+
+.toolBtnActive {
+  background: var(--color-primary, #00bcd4);
+  color: white;
+  border-color: var(--color-primary, #00bcd4);
+}
+
+.toolShortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+/* Shape list */
+.shapeList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.shapeItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.shapeItem:hover {
+  background: var(--color-hover, rgba(255, 255, 255, 0.05));
+}
+
+.shapeItemSelected {
+  background: var(--color-selected, rgba(0, 188, 212, 0.12));
+  outline: 1px solid var(--color-primary, #00bcd4);
+}
+
+.shapeColor {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.shapeIndex {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  min-width: 24px;
+}
+
+.shapeLabel {
+  flex: 1;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shapeDelete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.shapeItem:hover .shapeDelete {
+  opacity: 1;
+}
+
+.shapeDelete:hover {
+  background: var(--color-error, #f44336);
+  color: white;
+}
+
+.hint {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  margin: 8px 0 0;
+  line-height: 1.4;
+}

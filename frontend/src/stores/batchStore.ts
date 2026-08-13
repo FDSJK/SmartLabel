@@ -15,6 +15,7 @@ interface BatchState {
   doUploadToBatch: (batchId: number, files: File[]) => Promise<void>;
   doDeleteBatch: (batchId: number) => Promise<void>;
   deselectBatch: () => void;
+  updateImageLock: (imageId: number, lockedBy: string | null) => void;
 }
 
 export const useBatchStore = create<BatchState>((set, get) => ({
@@ -68,5 +69,13 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       set({ currentBatchId: null, images: [] });
     }
     await get().loadBatches();
+  },
+
+  updateImageLock: (imageId, lockedBy) => {
+    set(s => ({
+      images: s.images.map(img =>
+        img.id === imageId ? { ...img, locked_by_username: lockedBy } : img,
+      ),
+    }));
   },
 }));

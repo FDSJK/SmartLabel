@@ -1,0 +1,17 @@
+.container {
+  flex: 1;
+  overflow: hidden;
+  background: var(--color-canvas-bg, #1a1a2e);
+  position: relative;
+}
+
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  user-select: none;
+}
