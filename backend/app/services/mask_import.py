@@ -114,6 +114,8 @@ def import_image_masks(work_dir: str, batch: Batch, image: Image, db: Session) -
             result["errors"].append({"file": rel, "error": str(e)})
             continue
         if not polygons:
+            # 有 mask 文件但全黑为空 → 该标签在此图 absent
+            result["label_status"][label_name] = "absent"
             continue
 
         _, created = _get_or_create_label(db, label_name)
@@ -154,7 +156,7 @@ def import_batch_masks(work_dir: str, batch: Batch, db: Session, username: str =
         r = import_image_masks(work_dir, batch, image, db)
         result["errors"].extend(r["errors"])
         result["created_labels"].extend(r["created_labels"])
-        if not r["imported"]:
+        if not r["imported"] and not r["label_status"]:
             continue
 
         existing_status = data.get("labelStatus", {}) if data else {}

@@ -138,3 +138,34 @@ def test_import_donut_writes_holes(client, tmp_work_dir):
     assert len(sh["holes"]) == 1
     assert len(sh["holes"][0]) >= 4
     db.close()
+
+
+def test_import_empty_mask_marks_absent(client, tmp_work_dir):
+    token = _admin_token(client)
+    _make_image(tmp_work_dir)
+    client.post("/api/batches/scan", headers=_auth(token))
+    _make_mask(tmp_work_dir, val=0)  # 全黑 mask
+    from app.models.batch import Batch
+    db = _session()
+    batch = db.query(Batch).filter(Batch.name == "b1").one()
+    result = import_batch_masks(tmp_work_dir, batch, db, username="test")
+    assert result["imported"] == 1
+    data = json.load(open(os.path.join(tmp_work_dir, "batches", "b1", "annotations", "a.json")))
+    assert data["shapes"] == []
+    assert data["labelStatus"] == {"cat": "absent"}
+    db.close()
+
+
+def test_import_partial_labels_present_and_pending(client, tmp_work_dir):
+    token = _admin_token(client)
+    _make_image(tmp_work_dir)
+    client.post("/api/batches/scan", headers=_auth(token))
+    _make_mask(tmp_work_dir, label="cat", val=255)  # 只有 cat 有 mask
+    from app.models.batch import Batch
+    db = _session()
+    batch = db.query(Batch).filter(Batch.name == "b1").one()
+    import_batch_masks(tmp_work_dir, batch, db, username="test")
+    data = json.load(open(os.path.join(tmp_work_dir, "batches", "b1", "annotations", "a.json")))
+    # dog 没有 mask 文件 → 不在 labelStatus → 前端视为 pending
+    assert data["labelStatus"] == {"cat": "present"}
+    db.close()
