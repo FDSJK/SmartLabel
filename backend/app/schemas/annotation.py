@@ -6,7 +6,8 @@ class ShapeSchema(BaseModel):
     id: str = Field(description="Unique shape identifier (UUID)")
     label: str = Field(min_length=1, max_length=128)
     shapeType: Literal["polygon"] = "polygon"
-    points: list[list[float]] = Field(description="List of [x, y] vertex pairs")
+    points: list[list[float]] = Field(description="List of [x, y] vertex pairs (outer ring)")
+    holes: list[list[list[float]]] = Field(default_factory=list, description="Inner hole rings")
 
 
 class AnnotationSaveRequest(BaseModel):

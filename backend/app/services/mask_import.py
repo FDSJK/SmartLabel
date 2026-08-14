@@ -17,20 +17,21 @@ MIN_CONTOUR_AREA = 4.0
 DEFAULT_THRESHOLD = 128
 
 
-def vectorize_mask(mask_path: str, threshold: int = DEFAULT_THRESHOLD) -> list[list[list[float]]]:
-    """把一张二值 mask 图转成多边形列表。每个多边形为 [[x, y], ...]。
+def vectorize_mask(mask_path: str, threshold: int = DEFAULT_THRESHOLD) -> list[dict]:
+    """把一张二值 mask 图转成多边形列表，每个多边形为 {"points": 外环, "holes": [内环, ...]}。
 
     先转灰度、以 threshold 为界二值化（处理 JPG 有损压缩的边缘插值），
-    再用 OpenCV 提取外轮廓并做多边形简化。
+    再用 OpenCV 提取内外轮廓（RETR_CCOMP）并做多边形简化，把孔洞归到其外环下。
     """
     img = PILImage.open(mask_path).convert("L")
     arr = np.array(img, dtype=np.uint8)
     binary = (arr > threshold).astype(np.uint8) * 255
 
-    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(binary, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
-    polygons: list[list[list[float]]] = []
-    for c in contours:
+    # 先对每个轮廓做简化 + 过滤，记录存活轮廓（原索引 -> pts）
+    kept: dict[int, list[list[float]]] = {}
+    for i, c in enumerate(contours):
         if cv2.contourArea(c) < MIN_CONTOUR_AREA:
             continue
         peri = cv2.arcLength(c, True)
@@ -38,7 +39,21 @@ def vectorize_mask(mask_path: str, threshold: int = DEFAULT_THRESHOLD) -> list[l
         approx = cv2.approxPolyDP(c, epsilon, True)
         pts = [[float(p[0][0]), float(p[0][1])] for p in approx]
         if len(pts) >= 3:
-            polygons.append(pts)
+            kept[i] = pts
+
+    # RETR_CCOMP：外轮廓 parent == -1（level 0），孔 parent >= 0（level 1）
+    polygons: list[dict] = []
+    outer_by_idx: dict[int, dict] = {}
+    for i, pts in kept.items():
+        if hierarchy[0][i][3] == -1:
+            outer_by_idx[i] = {"points": pts, "holes": []}
+            polygons.append(outer_by_idx[i])
+
+    for i, pts in kept.items():
+        parent = hierarchy[0][i][3]
+        if parent in outer_by_idx:  # 孔，挂到其外环下；孤孔（外环被过滤）丢弃
+            outer_by_idx[parent]["holes"].append(pts)
+
     return polygons
 
 
@@ -105,12 +120,13 @@ def import_image_masks(work_dir: str, batch: Batch, image: Image, db: Session) -
         if created:
             result["created_labels"].append(label_name)
 
-        for pts in polygons:
+        for poly in polygons:
             result["shapes"].append({
                 "id": str(uuid.uuid4()),
                 "label": label_name,
                 "shapeType": "polygon",
-                "points": pts,
+                "points": poly["points"],
+                "holes": poly["holes"],
             })
         result["label_status"][label_name] = "present"
 

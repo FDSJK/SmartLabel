@@ -97,6 +97,7 @@ def save_annotation(
             "label": s.label,
             "shapeType": s.shapeType,
             "points": s.points,
+            "holes": s.holes,
         }
         for s in body.shapes
     ]

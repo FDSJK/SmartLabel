@@ -112,3 +112,29 @@ def test_import_logs_size_mismatch(client, tmp_work_dir):
     assert len(result["errors"]) == 1
     assert not os.path.isfile(os.path.join(tmp_work_dir, "batches", "b1", "annotations", "a.json"))
     db.close()
+
+
+def test_import_donut_writes_holes(client, tmp_work_dir):
+    token = _admin_token(client)
+    _make_image(tmp_work_dir)
+    client.post("/api/batches/scan", headers=_auth(token))
+
+    # 环形 mask：外框填充 + 中间挖洞（scan 之后创建，避免被 scan 自动导入）
+    d = os.path.join(tmp_work_dir, "batches", "b1", "masks", "cat")
+    os.makedirs(d)
+    mask = np.zeros((64, 64), dtype=np.uint8)
+    mask[16:48, 16:48] = 255
+    mask[28:36, 28:36] = 0
+    PILImage.fromarray(mask).save(os.path.join(d, "a.png"))
+
+    from app.models.batch import Batch
+    db = _session()
+    batch = db.query(Batch).filter(Batch.name == "b1").one()
+    result = import_batch_masks(tmp_work_dir, batch, db, username="test")
+    assert result["imported"] == 1
+    data = json.load(open(os.path.join(tmp_work_dir, "batches", "b1", "annotations", "a.json")))
+    sh = data["shapes"][0]
+    assert len(sh["points"]) >= 4
+    assert len(sh["holes"]) == 1
+    assert len(sh["holes"][0]) >= 4
+    db.close()
