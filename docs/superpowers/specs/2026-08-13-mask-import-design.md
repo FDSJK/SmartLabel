@@ -48,11 +48,11 @@ batches/<batch>/
 1. Pillow 打开 → `convert("L")` 转灰度（兼容 RGB 三通道的"二值"图）。
 2. NumPy 阈值化：`(arr > 128).astype(np.uint8) * 255`。
    - **原因**：JPG 有损压缩使分割边缘出现 0–255 之间的插值，需先以 128 为界二值化。
-3. OpenCV `findContours(binary, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)`。
-   - `RETR_EXTERNAL` 只取外轮廓（孔洞被填实，见 §6 已知限制）。
+3. OpenCV `findContours(binary, RETR_CCOMP, CHAIN_APPROX_SIMPLE)`。
+   - `RETR_CCOMP` 同时提取外轮廓与内轮廓（孔洞），通过 hierarchy 把孔洞归到其外环下。
 4. 每个轮廓用 `approxPolyDP(contour, epsilon, closed=True)` 简化，`epsilon = max(1.0, 0.005 * arcLength)`。
 5. 过滤面积 `< 4px` 的噪声轮廓；点数 `< 3` 的丢弃。
-6. 输出 `list[list[list[float]]]`，每个多边形为 `[[x,y], ...]`。
+6. 输出 `list[dict]`，每个多边形为 `{"points": [[x,y], ...], "holes": [[[x,y], ...], ...]}`。
 
 ### 3.2 空标注判定
 
@@ -100,7 +100,8 @@ batches/<batch>/
 
 ## 6. 已知限制
 
-- `RETR_EXTERNAL` 只提取外轮廓，**mask 内部孔洞会被填实**（v1 不保留孔洞；现有 Shape 模型也不支持孔洞）。
+- `RETR_CCOMP` 仅两层：孔内的孤岛会被当作独立外环（极端嵌套场景，实践中罕见）。
+- 孔顶点不可单独拖拽编辑（顶点手柄只作用于外环）；整体移动、增添/裁剪会保留孔。
 - 自动创建标签的颜色为调色板轮转分配，颜色可后续在标签管理中修改。
 - 导入的 mask 为预标注，图像 `status` 仍为 `pending`，需人工在「标签状态」确认后方计为完成。
 
