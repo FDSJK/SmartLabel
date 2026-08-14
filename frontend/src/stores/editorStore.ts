@@ -78,6 +78,7 @@ interface EditorState {
 
   // Actions — Label status
   setLabelStatus: (label: string, status: LabelStatusValue) => void;
+  cycleLabelStatus: (label: string) => void;
 
   // Actions — Undo/Redo
   undo: () => void;
@@ -146,6 +147,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       shapes: [...shapes, shape],
+      labelStatus: { ...labelStatus, [selectedLabel]: 'present' },
       drawingPoints: null,
       undoStack,
       redoStack: [],
@@ -173,16 +175,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   deleteSelectedShape: () => {
     const { selectedShapeId, shapes, labelStatus } = get();
     if (!selectedShapeId) return;
-
+    const deleted = shapes.find(s => s.id === selectedShapeId);
+    if (!deleted) return;
+    const label = deleted.label;
+    const remaining = shapes.filter(s => s.id !== selectedShapeId);
+    const newStatus: LabelStatusValue = remaining.some(s => s.label === label) ? 'present' : 'absent';
     const snapshot = cloneSnapshot(shapes, labelStatus);
     const undoStack = [...get().undoStack, snapshot].slice(-MAX_UNDO);
-
     set({
-      shapes: shapes.filter(s => s.id !== selectedShapeId),
+      shapes: remaining,
+      labelStatus: { ...labelStatus, [label]: newStatus },
       selectedShapeId: null,
-      undoStack,
-      redoStack: [],
-      isDirty: true,
+      undoStack, redoStack: [], isDirty: true,
     });
   },
 
@@ -237,6 +241,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       shapes: [...remaining, ...newShapes],
+      labelStatus: { ...labelStatus, [selected.label]: 'present' },
       selectedShapeId: selected.id,
       undoStack,
       redoStack: [],
@@ -260,8 +265,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     if (result.length === 0) {
       // Cut removed everything — delete the shape
+      const remaining = shapes.filter(s => s.id !== selectedShapeId);
+      const newStatus: LabelStatusValue = remaining.some(s => s.label === selected.label) ? 'present' : 'absent';
       set({
-        shapes: shapes.filter(s => s.id !== selectedShapeId),
+        shapes: remaining,
+        labelStatus: { ...labelStatus, [selected.label]: newStatus },
         selectedShapeId: null,
         undoStack,
         redoStack: [],
@@ -285,6 +293,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       shapes: [...others, ...newShapes],
+      labelStatus: { ...labelStatus, [selected.label]: 'present' },
       selectedShapeId: selected.id,
       undoStack,
       redoStack: [],
@@ -304,6 +313,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       redoStack: [],
       isDirty: true,
     });
+  },
+
+  cycleLabelStatus: (label) => {
+    const { labelStatus, shapes } = get();
+    const current = labelStatus[label] ?? 'pending';
+    const hasShapes = shapes.some(s => s.label === label);
+    const next: LabelStatusValue =
+      current === 'pending' ? (hasShapes ? 'present' : 'absent') : 'pending';
+    get().setLabelStatus(label, next);
   },
 
   // --- Undo/Redo ---
