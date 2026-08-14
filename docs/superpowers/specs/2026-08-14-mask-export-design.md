@@ -59,7 +59,9 @@ batches/<batch>/
 **初始状态（mask 导入时）：**
 
 - 导入**无 mask** 的数据 → 所有标签初始 `pending`。
-- 导入**含 mask** 的数据 → 有 mask 内容的标签 `present`，没有的 `absent`（按内容填，不留 pending）。
+- 导入**含 mask** 的数据 → 有 mask 内容的标签 `present`；**没有 mask 内容的标签（无 mask 文件、
+  或 mask 全黑为空，即「只导入了部分标签」）→ `pending`**。
+- `absent` **不由导入自动设置**，只在标注者之后手动清空该标签内容时产生（删掉最后一个形状）。
 
 **边界（已确认）：** 某标签被手动标了 `pending`，之后又去画/删它的形状 → 内容一变就自动回到
 `present`/`absent`。即 `pending` 只对「还没碰过的标签」持续有效。
@@ -110,7 +112,7 @@ batches/<batch>/
 | `backend/app/services/mask_export.py` | 新增：`shapes_to_masks`、`export_image_masks` |
 | `backend/app/api/images.py` | 新增 `POST /images/{id}/export-mask` 端点 |
 | `backend/app/schemas/annotation.py`（或新增 schema） | 新增 `MaskExportRequest {shapes, labelStatus}` / `MaskExportResponse {saved}` |
-| `backend/app/services/mask_import.py` | 初始 `labelStatus` 按「有/无 mask」填 present/absent/pending |
+| `backend/app/services/mask_import.py` | 无需改动（现有逻辑已是「有 mask 内容 → present，无 → 留空即 pending」） |
 | `frontend/src/api/masks.ts` | 新增：`exportImageMask(imageId, shapes, labelStatus)` |
 | `frontend/src/stores/editorStore.ts` | 画/删形状时自动更新 labelStatus；`setLabelStatus` 改为单键 pending↔内容推导 |
 | `frontend/src/components/panels/LabelStatusList.tsx` | 按钮改为 pending↔(present/absent) 单键切换 |
