@@ -4,7 +4,7 @@ import { useEditorStore } from '../../stores/editorStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useLabelStore } from '../../stores/labelStore';
 import { useImageStore } from '../../stores/imageStore';
-import { distance, pointToSegmentDistance, isPointInPolygon } from '../../utils/geometry';
+import { distance, pointToSegmentDistance, isPointInShape } from '../../utils/geometry';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Shape } from '../../types/shapes';
 
@@ -78,6 +78,7 @@ export default function DrawingLayer() {
     shapeId: string;
     vertexIndex?: number;
     startPoints: number[][];
+    startHoles?: number[][][];
     startPos: [number, number];
   } | null>(null);
   const mousedownPos = useRef<[number, number] | null>(null);
@@ -224,12 +225,14 @@ export default function DrawingLayer() {
                   type: 'vertex', shapeId: v.shapeId, vertexIndex: v.vertexIndex,
                   startPoints: selShape.points.map(p => [...p]), startPos: [ix, iy],
                 };
-              } else if (isPointInPolygon(sx, sy, selShape.points)) {
+              } else if (isPointInShape(sx, sy, selShape.points, selShape.holes ?? [])) {
                 // Point inside shape → move entire shape
                 hit = true;
                 dragRef.current = {
                   type: 'shape', shapeId: selShape.id,
-                  startPoints: selShape.points.map(p => [...p]), startPos: [ix, iy],
+                  startPoints: selShape.points.map(p => [...p]),
+                  startHoles: (selShape.holes ?? []).map(h => h.map(p => [...p])),
+                  startPos: [ix, iy],
                 };
               }
             }
@@ -257,7 +260,8 @@ export default function DrawingLayer() {
           useEditorStore.getState().updateShape(d.shapeId, np);
         } else if (d.type === 'shape') {
           const np = d.startPoints.map(p => [p[0] + dx, p[1] + dy]);
-          useEditorStore.getState().updateShape(d.shapeId, np);
+          const nh = (d.startHoles ?? []).map(h => h.map(p => [p[0] + dx, p[1] + dy]));
+          useEditorStore.getState().updateShape(d.shapeId, np, nh);
         }
         return;
       }
@@ -346,7 +350,7 @@ export default function DrawingLayer() {
       }
       // 3) Check if point is inside any shape
       for (const shape of currentShapes) {
-        if (isPointInPolygon(ix, iy, shape.points)) {
+        if (isPointInShape(ix, iy, shape.points, shape.holes ?? [])) {
           store.selectShape(shape.id);
           return;
         }

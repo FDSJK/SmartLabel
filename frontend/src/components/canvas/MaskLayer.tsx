@@ -1,11 +1,19 @@
-import { Line } from 'react-konva';
+import { Path } from 'react-konva';
 import { useEditorStore } from '../../stores/editorStore';
 import { useLabelStore } from '../../stores/labelStore';
 import { useUIStore } from '../../stores/uiStore';
 
+/** Build an SVG path string from an outer ring plus inner hole rings. */
+function toSvgPath(points: number[][], holes: number[][][]): string {
+  const ring = (r: number[][]) =>
+    r.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join('') + 'Z';
+  return ring(points) + holes.map(ring).join('');
+}
+
 /**
  * Renders confirmed shapes as filled semi-transparent polygons.
  * Each shape's fill color comes from its label definition.
+ * Holes are rendered via even-odd fill rule.
  * Visibility is controlled by uiStore.showMask.
  */
 export default function MaskLayer() {
@@ -25,20 +33,17 @@ export default function MaskLayer() {
   return (
     <>
       {shapes.map(shape => {
-        // Flatten points array for Konva Line: [[x1,y1], [x2,y2], ...] → [x1, y1, x2, y2, ...]
-        const flatPoints = shape.points.flat();
         const fillColor = colorMap.get(shape.label) || '#888888';
 
         return (
-          <Line
+          <Path
             key={shape.id}
-            points={flatPoints}
-            closed
+            data={toSvgPath(shape.points, shape.holes ?? [])}
+            fillRule="evenodd"
             {...(showFill ? { fill: fillColor, fillOpacity: 0.25 } : {})}
             stroke={fillColor}
             strokeWidth={showFill ? 1.5 : 2.5}
             lineJoin="round"
-            hitStrokeWidth={8}
             listening={false}
           />
         );

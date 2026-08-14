@@ -5,25 +5,34 @@ import {
   unionMany,
   subtractPolygons,
   polygonsOverlap,
-  polygonArea,
+  shapeArea,
+  type PolyWithHoles,
 } from '../utils/geometry';
 
 const MAX_UNDO = 50;
 
 /** Index of the piece with the largest area. */
-function indexOfLargest(pieces: number[][][]): number {
+function indexOfLargest(pieces: PolyWithHoles[]): number {
   let best = 0;
   let bestArea = -1;
   for (let i = 0; i < pieces.length; i++) {
-    const a = polygonArea(pieces[i]);
+    const a = shapeArea(pieces[i]);
     if (a > bestArea) { bestArea = a; best = i; }
   }
   return best;
 }
 
+function cloneShape(s: Shape): Shape {
+  return {
+    ...s,
+    points: s.points.map(p => [...p]),
+    holes: (s.holes ?? []).map(h => h.map(p => [...p])),
+  };
+}
+
 function cloneSnapshot(shapes: Shape[], labelStatus: Record<string, LabelStatusValue>): Snapshot {
   return {
-    shapes: shapes.map(s => ({ ...s, points: s.points.map(p => [...p]) })),
+    shapes: shapes.map(cloneShape),
     labelStatus: { ...labelStatus },
   };
 }
@@ -62,7 +71,7 @@ interface EditorState {
   cancelDrawing: () => void;
 
   // Actions — Shapes
-  updateShape: (id: string, points: number[][]) => void;
+  updateShape: (id: string, points: number[][], holes?: number[][][]) => void;
   deleteSelectedShape: () => void;
   applyAdd: (drawnPoints: number[][]) => void;
   applyCut: (drawnPoints: number[][]) => void;
@@ -147,13 +156,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   cancelDrawing: () => set({ drawingPoints: null }),
 
   // --- Shape editing ---
-  updateShape: (id, points) => {
+  updateShape: (id, points, holes) => {
     const { shapes, labelStatus } = get();
     const snapshot = cloneSnapshot(shapes, labelStatus);
     const undoStack = [...get().undoStack, snapshot].slice(-MAX_UNDO);
 
     set({
-      shapes: shapes.map(s => (s.id === id ? { ...s, points } : s)),
+      shapes: shapes.map(s =>
+        s.id === id ? { ...s, points, ...(holes !== undefined ? { holes } : {}) } : s),
       undoStack,
       redoStack: [],
       isDirty: true,
@@ -189,10 +199,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const sameLabel = shapes.filter(s => s.label === selected.label && s.id !== selected.id);
 
     // Start with (selected + drawn)
-    let merged = unionPolygons(selected.points, drawnPoints);
+    const selPoly: PolyWithHoles = { points: selected.points, holes: selected.holes ?? [] };
+    const drawnPoly: PolyWithHoles = { points: drawnPoints, holes: [] };
+    let merged = unionPolygons(selPoly, drawnPoly);
     // Also merge any same-label shapes that the drawn area connects
     if (sameLabel.length > 0 && merged.length > 0) {
-      const allPieces = [...merged, ...sameLabel.map(s => s.points)];
+      const allPieces: PolyWithHoles[] = [
+        ...merged,
+        ...sameLabel.map(s => ({ points: s.points, holes: s.holes ?? [] })),
+      ];
       merged = unionMany(allPieces);
     }
 
@@ -209,14 +224,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // polygon-clipping may reorder pieces, so `merged[0]` is not guaranteed to
     // be the selected shape's continuation. Assign `selected.id` to the piece
     // that overlaps the original selected shape to keep the selection stable.
-    let selectedIdx = merged.findIndex(p => polygonsOverlap(p, selected.points));
+    let selectedIdx = merged.findIndex(p => polygonsOverlap(p, selPoly));
     if (selectedIdx === -1) selectedIdx = indexOfLargest(merged);
 
-    const newShapes: Shape[] = merged.map((points, i) => ({
+    const newShapes: Shape[] = merged.map((p, i) => ({
       id: i === selectedIdx ? selected.id : crypto.randomUUID(),
       label: selected.label,
       shapeType: 'polygon' as const,
-      points,
+      points: p.points,
+      holes: p.holes,
     }));
 
     set({
@@ -235,7 +251,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const selected = shapes.find(s => s.id === selectedShapeId);
     if (!selected) return;
 
-    const result = subtractPolygons(selected.points, drawnPoints);
+    const selPoly: PolyWithHoles = { points: selected.points, holes: selected.holes ?? [] };
+    const drawnPoly: PolyWithHoles = { points: drawnPoints, holes: [] };
+    const result = subtractPolygons(selPoly, drawnPoly);
 
     const snapshot = cloneSnapshot(shapes, labelStatus);
     const undoStack = [...get().undoStack, snapshot].slice(-MAX_UNDO);
@@ -257,11 +275,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // the dominant continuation (polygon-clipping may reorder pieces).
     const others = shapes.filter(s => s.id !== selected.id);
     const selectedIdx = indexOfLargest(result);
-    const newShapes: Shape[] = result.map((points, i) => ({
+    const newShapes: Shape[] = result.map((p, i) => ({
       id: i === selectedIdx ? selected.id : crypto.randomUUID(),
       label: selected.label,
       shapeType: 'polygon' as const,
-      points,
+      points: p.points,
+      holes: p.holes,
     }));
 
     set({
@@ -296,7 +315,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const prev = undoStack[undoStack.length - 1];
 
     set({
-      shapes: prev.shapes.map(s => ({ ...s, points: s.points.map(p => [...p]) })),
+      shapes: prev.shapes.map(cloneShape),
       labelStatus: { ...prev.labelStatus },
       undoStack: undoStack.slice(0, -1),
       redoStack: [...get().redoStack, snapshot],
@@ -312,7 +331,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const next = redoStack[redoStack.length - 1];
 
     set({
-      shapes: next.shapes.map(s => ({ ...s, points: s.points.map(p => [...p]) })),
+      shapes: next.shapes.map(cloneShape),
       labelStatus: { ...next.labelStatus },
       redoStack: redoStack.slice(0, -1),
       undoStack: [...get().undoStack, snapshot],
@@ -323,7 +342,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // --- Data ---
   loadAnnotation: (shapes, labelStatus, version) => {
     set({
-      shapes: shapes.map(s => ({ ...s, points: s.points.map(p => [...p]) })),
+      shapes: shapes.map(cloneShape),
       labelStatus: { ...labelStatus },
       version,
       drawingPoints: null,

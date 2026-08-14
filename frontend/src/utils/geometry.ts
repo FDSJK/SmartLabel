@@ -4,6 +4,12 @@ type Pair = [number, number];
 type Ring = Pair[];
 type MultiPoly = Ring[][];
 
+/** A polygon with optional inner rings (holes). */
+export interface PolyWithHoles {
+  points: number[][];
+  holes: number[][][];
+}
+
 function toRing(pts: number[][]): Ring {
   return pts.map(p => [p[0], p[1]] as Pair);
 }
@@ -12,43 +18,50 @@ function fromRing(ring: Ring): number[][] {
   return ring.map(p => [p[0], p[1]]);
 }
 
-/** Extract all outer rings from a polygon-clipping multi-polygon result. */
-function fromMultiPoly(result: MultiPoly): number[][][] {
+function toClipping(p: PolyWithHoles): Ring[] {
+  return [toRing(p.points), ...p.holes.map(toRing)];
+}
+
+/** Convert a polygon-clipping multi-polygon result into polygons-with-holes. */
+function fromClipping(result: MultiPoly): PolyWithHoles[] {
   return result
     .filter(poly => poly && poly.length > 0)
-    .map(poly => fromRing(poly[0]))
-    .filter(ring => ring.length >= 3);
+    .map(poly => ({
+      points: fromRing(poly[0]),
+      holes: poly.slice(1).map(fromRing).filter(h => h.length >= 3),
+    }))
+    .filter(p => p.points.length >= 3);
 }
 
 /**
- * Union two simple polygons.
+ * Union two polygons (with holes).
  * Returns ALL resulting polygons (multi-polygon), or empty array.
  */
-export function unionPolygons(a: number[][], b: number[][]): number[][][] {
-  const result = polygonClipping.union([toRing(a)], [toRing(b)]);
-  return fromMultiPoly(result as MultiPoly);
+export function unionPolygons(a: PolyWithHoles, b: PolyWithHoles): PolyWithHoles[] {
+  const result = polygonClipping.union(toClipping(a), toClipping(b));
+  return fromClipping(result as MultiPoly);
 }
 
 /**
  * Union multiple polygons together (for merging shapes of same label).
  * Returns ALL resulting polygons, or empty array.
  */
-export function unionMany(polygons: number[][][]): number[][][] {
-  if (polygons.length === 0) return [];
-  let result: MultiPoly = [[toRing(polygons[0])]];
-  for (let i = 1; i < polygons.length; i++) {
-    result = polygonClipping.union(result, [toRing(polygons[i])]) as MultiPoly;
+export function unionMany(polys: PolyWithHoles[]): PolyWithHoles[] {
+  if (polys.length === 0) return [];
+  let result: MultiPoly = [toClipping(polys[0])];
+  for (let i = 1; i < polys.length; i++) {
+    result = polygonClipping.union(result, toClipping(polys[i])) as MultiPoly;
   }
-  return fromMultiPoly(result);
+  return fromClipping(result);
 }
 
 /**
  * Subtract polygon b from polygon a (a - b).
  * Returns ALL resulting polygons (multi-polygon), or empty array.
  */
-export function subtractPolygons(a: number[][], b: number[][]): number[][][] {
-  const result = polygonClipping.difference([toRing(a)], [toRing(b)]);
-  return fromMultiPoly(result as MultiPoly);
+export function subtractPolygons(a: PolyWithHoles, b: PolyWithHoles): PolyWithHoles[] {
+  const result = polygonClipping.difference(toClipping(a), toClipping(b));
+  return fromClipping(result as MultiPoly);
 }
 
 /** Euclidean distance between two points */
@@ -103,13 +116,20 @@ export function polygonArea(points: number[][]): number {
   return Math.abs(signedArea(points));
 }
 
+/** Area of a polygon-with-holes (outer area minus hole areas). */
+export function shapeArea(p: PolyWithHoles): number {
+  let a = polygonArea(p.points);
+  for (const h of p.holes) a -= polygonArea(h);
+  return a;
+}
+
 /**
- * True if two polygons overlap (their intersection has non-zero area).
+ * True if two polygons (with holes) overlap (their intersection has non-zero area).
  */
-export function polygonsOverlap(a: number[][], b: number[][]): boolean {
-  const result = polygonClipping.intersection([toRing(a)], [toRing(b)]);
-  const pieces = fromMultiPoly(result as MultiPoly);
-  return pieces.some(p => polygonArea(p) > 1e-6);
+export function polygonsOverlap(a: PolyWithHoles, b: PolyWithHoles): boolean {
+  const result = polygonClipping.intersection(toClipping(a), toClipping(b));
+  const pieces = fromClipping(result as MultiPoly);
+  return pieces.some(p => shapeArea(p) > 1e-6);
 }
 
 /**
@@ -128,6 +148,15 @@ export function isPointInPolygon(px: number, py: number, points: number[][]): bo
     if (intersect) inside = !inside;
   }
   return inside;
+}
+
+/**
+ * True if point is inside a polygon-with-holes: inside the outer ring
+ * and not inside any hole ring.
+ */
+export function isPointInShape(px: number, py: number, points: number[][], holes: number[][][]): boolean {
+  if (!isPointInPolygon(px, py, points)) return false;
+  return !holes.some(h => isPointInPolygon(px, py, h));
 }
 
 /**

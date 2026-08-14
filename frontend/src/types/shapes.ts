@@ -7,6 +7,7 @@ export interface Shape {
   label: string;
   shapeType: 'polygon';
   points: number[][];
+  holes?: number[][][];
 }
 
 export interface Snapshot {
