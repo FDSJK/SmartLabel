@@ -59,9 +59,11 @@ batches/<batch>/
 **初始状态（mask 导入时）：**
 
 - 导入**无 mask** 的数据 → 所有标签初始 `pending`。
-- 导入**含 mask** 的数据 → 有 mask 内容的标签 `present`；**没有 mask 内容的标签（无 mask 文件、
-  或 mask 全黑为空，即「只导入了部分标签」）→ `pending`**。
-- `absent` **不由导入自动设置**，只在标注者之后手动清空该标签内容时产生（删掉最后一个形状）。
+- 导入**含 mask** 的数据（`masks/` 下可能只有部分标签的子目录，例如 10 个标签只导入了 3 个）：
+  - **有 mask 文件**且非空（≥1 个形状）→ `present`；
+  - **有 mask 文件**但全黑为空（0 个形状）→ `absent`；
+  - **没有 mask 文件**的标签 → `pending`（只导入部分标签时，其余标签一律待定）。
+- 即：`present`/`absent` 只对「有 mask 文件」的标签按内容判定；其余 `absent` 由标注者之后手动清空内容产生（删掉最后一个形状）。
 
 **边界（已确认）：** 某标签被手动标了 `pending`，之后又去画/删它的形状 → 内容一变就自动回到
 `present`/`absent`。即 `pending` 只对「还没碰过的标签」持续有效。
@@ -112,7 +114,7 @@ batches/<batch>/
 | `backend/app/services/mask_export.py` | 新增：`shapes_to_masks`、`export_image_masks` |
 | `backend/app/api/images.py` | 新增 `POST /images/{id}/export-mask` 端点 |
 | `backend/app/schemas/annotation.py`（或新增 schema） | 新增 `MaskExportRequest {shapes, labelStatus}` / `MaskExportResponse {saved}` |
-| `backend/app/services/mask_import.py` | 无需改动（现有逻辑已是「有 mask 内容 → present，无 → 留空即 pending」） |
+| `backend/app/services/mask_import.py` | 有 mask 文件但全黑（0 形状）→ 填 `absent`（现有逻辑漏掉这个，仍当 pending） |
 | `frontend/src/api/masks.ts` | 新增：`exportImageMask(imageId, shapes, labelStatus)` |
 | `frontend/src/stores/editorStore.ts` | 画/删形状时自动更新 labelStatus；`setLabelStatus` 改为单键 pending↔内容推导 |
 | `frontend/src/components/panels/LabelStatusList.tsx` | 按钮改为 pending↔(present/absent) 单键切换 |
@@ -128,6 +130,8 @@ batches/<batch>/
 - 同标签多 shape 重叠时按「填所有外环、再挖所有孔」处理，不做并集运算（非重叠场景精确，
   重叠的极端场景可能不完美并集）。
 - 孔的顶点不可单独编辑（继承自导入方向，见 mask-import spec §6）。
+- 若某图像**所有**导入的 mask 均为空（无任何形状），当前 `import_batch_masks` 因 `imported=False`
+  不会写 JSON，此时 absent 状态不落盘——罕见边界，实现时顺带处理（有 `label_status` 也应写）。
 
 ## 7. 测试
 
