@@ -31,3 +31,13 @@ class AnnotationReadResponse(BaseModel):
     shapes: list[ShapeSchema]
     labelStatus: dict[str, str]
     version: int
+
+
+class MaskExportRequest(BaseModel):
+    shapes: list[ShapeSchema]
+    labelStatus: dict[str, str] = Field(default_factory=dict)
+
+
+class MaskExportResponse(BaseModel):
+    saved: list[str]
+    errors: list[dict[str, str]] = Field(default_factory=list)

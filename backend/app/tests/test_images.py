@@ -69,3 +69,43 @@ class TestServeImageFile:
     def test_serve_image_requires_auth(self, client: TestClient):
         resp = client.get("/api/images/1/file")
         assert resp.status_code == 401
+
+
+class TestExportMask:
+    def _setup(self, client, tmp_work_dir):
+        token = _admin_token(client)
+        batches_dir = os.path.join(tmp_work_dir, "batches", "test-batch", "images")
+        os.makedirs(batches_dir)
+        PILImage.fromarray(np.zeros((50, 50, 3), dtype=np.uint8) + 128).save(
+            os.path.join(batches_dir, "sample.png"))
+        from app.main import app
+        from app.core.db import get_db
+        db = next(app.dependency_overrides[get_db]())
+        from app.models.batch import Batch
+        from app.models.image import Image
+        batch = Batch(name="test-batch", source="upload")
+        db.add(batch); db.commit(); db.refresh(batch)
+        image = Image(batch_id=batch.id, file_name="sample.png",
+                      src_rel_path="batches/test-batch/images/sample.png",
+                      width=50, height=50, channels=3)
+        db.add(image); db.commit(); db.refresh(image)
+        return token, image
+
+    def test_export_mask_writes_file(self, client, tmp_work_dir):
+        token, image = self._setup(client, tmp_work_dir)
+        shapes = [{"id": "x", "label": "cat", "shapeType": "polygon",
+                   "points": [[0, 0], [20, 0], [20, 20], [0, 20]], "holes": []}]
+        resp = client.post(f"/api/images/{image.id}/export-mask",
+                           json={"shapes": shapes,
+                                 "labelStatus": {"cat": "present", "dog": "absent"}},
+                           headers=_auth(token))
+        assert resp.status_code == 200
+        assert resp.json()["saved"] == ["cat", "dog"]
+        assert os.path.isfile(os.path.join(
+            tmp_work_dir, "batches", "test-batch", "masks", "cat", "sample.png"))
+
+    def test_export_mask_404(self, client):
+        token = _admin_token(client)
+        resp = client.post("/api/images/99999/export-mask",
+                           json={"shapes": [], "labelStatus": {}}, headers=_auth(token))
+        assert resp.status_code == 404
