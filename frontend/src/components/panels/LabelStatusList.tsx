@@ -14,22 +14,12 @@ export default function LabelStatusList() {
   const selectedLabel = useEditorStore(s => s.selectedLabel);
   const labelStatus = useEditorStore(s => s.labelStatus);
   const setSelectedLabel = useEditorStore(s => s.setSelectedLabel);
-  const setLabelStatus = useEditorStore(s => s.setLabelStatus);
+  const cycleLabelStatus = useEditorStore(s => s.cycleLabelStatus);
 
   const enabledLabels = labels.filter(l => l.enabled);
 
   if (enabledLabels.length === 0) {
     return <div className={styles.empty}>暂无标签，请先创建</div>;
-  }
-
-  function cycleStatus(labelName: string) {
-    const current = labelStatus[labelName] || 'pending';
-    const next: Record<string, LabelStatusValue> = {
-      pending: 'present',
-      present: 'absent',
-      absent: 'pending',
-    };
-    setLabelStatus(labelName, next[current]);
   }
 
   return (
@@ -67,8 +57,8 @@ export default function LabelStatusList() {
               {/* Status toggle */}
               <button
                 className={`${styles.statusBtn} ${styles[STATUS_OPTIONS.find(o => o.value === status)?.className || 'pending']}`}
-                onClick={() => cycleStatus(label.name)}
-                title={`状态: ${status}（点击切换）`}
+                onClick={() => cycleLabelStatus(label.name)}
+                title={`状态: ${status}（点击切换待定）`}
               >
                 {STATUS_OPTIONS.find(o => o.value === status)?.label || '?'}
               </button>
