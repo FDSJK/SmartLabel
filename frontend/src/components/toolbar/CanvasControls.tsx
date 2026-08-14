@@ -24,6 +24,7 @@ export default function CanvasControls() {
   const labelStatus = useEditorStore(s => s.labelStatus);
   const shapes = useEditorStore(s => s.shapes);
   const [maskStatus, setMaskStatus] = useState<'idle' | 'exporting' | 'done' | 'error'>('idle');
+  const [maskError, setMaskError] = useState<string | null>(null);
 
   const hasPresentOrAbsent = Object.values(labelStatus).some(v => v === 'present' || v === 'absent');
   const canExport = currentImage !== null && lockedByMe && hasPresentOrAbsent;
@@ -38,12 +39,21 @@ export default function CanvasControls() {
       if (!ok) return;
     }
     setMaskStatus('exporting');
+    setMaskError(null);
     try {
-      await exportImageMask(currentImage.id, shapes, labelStatus);
-      setMaskStatus('done');
-      window.setTimeout(() => setMaskStatus('idle'), 2500);
+      const res = await exportImageMask(currentImage.id, shapes, labelStatus);
+      if (res.errors.length > 0) {
+        setMaskError(`部分标签保存失败：${res.errors.map(e => e.label).join('、')}`);
+        setMaskStatus('error');
+        window.setTimeout(() => setMaskStatus('idle'), 4000);
+      } else {
+        setMaskStatus('done');
+        window.setTimeout(() => setMaskStatus('idle'), 2500);
+      }
     } catch {
+      setMaskError('保存 mask 失败');
       setMaskStatus('error');
+      window.setTimeout(() => setMaskStatus('idle'), 4000);
     }
   }
 
@@ -87,7 +97,7 @@ export default function CanvasControls() {
       >
         {maskStatus === 'exporting' ? '⏳' : maskStatus === 'done' ? '✓' : '⬇'}
         <span className={styles.tooltip}>
-          {maskStatus === 'done' ? '已保存 mask' : maskStatus === 'error' ? '保存 mask 失败' : '保存 mask'}
+          {maskStatus === 'done' ? '已保存 mask' : maskStatus === 'error' ? (maskError ?? '保存 mask 失败') : '保存 mask'}
         </span>
       </button>
       <SaveIndicator />
