@@ -51,6 +51,15 @@ def test_mask_to_rle_roundtrip():
     assert np.array_equal(_decode_rle(rle), (mask > 0).astype(np.uint8))
 
 
+def test_mask_to_rle_ends_in_foreground():
+    mask = np.zeros((8, 8), dtype=np.uint8)
+    mask[4:, 4:] = 255  # 右下角块为前景：F 序最后一个像素是前景
+    rle = _mask_to_rle(mask)
+    assert len(rle["counts"]) % 2 == 0
+    assert sum(rle["counts"]) == 8 * 8
+    assert np.array_equal(_decode_rle(rle), (mask > 0).astype(np.uint8))
+
+
 def test_build_coco_donut():
     img = _img(1, "a.png")
     labels = [_label(1, "cat")]
@@ -69,6 +78,15 @@ def test_build_coco_donut():
     m = _decode_rle(ann["segmentation_rle"])
     assert m[10, 10] == 0
     assert m[2, 2] == 1
+
+
+def test_build_coco_skips_non_present():
+    img = _img(1, "a.png")
+    labels = [_label(1, "cat")]
+    shape = {"id": "s1", "label": "cat", "shapeType": "polygon",
+             "points": [[0, 0], [20, 0], [20, 20], [0, 20]], "holes": []}
+    doc = _build_coco([(img, {"shapes": [shape], "labelStatus": {"cat": "absent"}})], labels)
+    assert doc["annotations"] == []
 
 
 def test_build_labelme_hole_as_background():
@@ -94,7 +112,7 @@ def test_compute_pending():
     ]
 
 
-def test_generate_export_masks(client, tmp_work_dir):
+def test_generate_export_all_formats(client, tmp_work_dir):
     from app.main import app
     from app.core.db import get_db
     from app.models.batch import Batch
@@ -124,11 +142,12 @@ def test_generate_export_masks(client, tmp_work_dir):
 
     collected = collect_scope(tmp_work_dir, db, "batch", None, batch.id)
     result = generate_export(tmp_work_dir, db, scope="batch", image_id=None, batch_id=batch.id,
-                             collected=collected, formats=["mask"])
+                             collected=collected, formats=["mask", "coco", "labelme"])
     db.close()
 
     assert result["image_count"] == 1
     assert result["mask_count"] == 2                      # cat + dog；bird pending 跳过
+    assert result["annotation_count"] == 1                # cat present 且有 shape
     masks_dir = os.path.join(tmp_work_dir, result["export_dir"], "masks")
     assert os.path.isfile(os.path.join(masks_dir, "cat", "a.png"))
     assert os.path.isfile(os.path.join(masks_dir, "dog", "a.png"))
@@ -137,3 +156,13 @@ def test_generate_export_masks(client, tmp_work_dir):
     dog = np.array(PILImage.open(os.path.join(masks_dir, "dog", "a.png")).convert("L"))
     assert cat[5, 5] == 255
     assert dog.max() == 0
+
+    coco_path = os.path.join(tmp_work_dir, result["export_dir"], "coco", "annotations.json")
+    labelme_path = os.path.join(tmp_work_dir, result["export_dir"], "labelme", "a.json")
+    assert os.path.isfile(coco_path)
+    assert os.path.isfile(labelme_path)
+    doc = json.load(open(coco_path))
+    assert len(doc["annotations"]) == 1
+    assert len(doc["categories"]) == 2                    # cat + dog（bird 不是库中标签）
+    labelme = json.load(open(labelme_path))
+    assert labelme["labelStatus"] == {"cat": "present", "dog": "absent", "bird": "pending"}

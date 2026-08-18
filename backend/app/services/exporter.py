@@ -58,7 +58,7 @@ def _bbox_of(polys):
 # ---------- RLE ----------
 
 def _mask_to_rle(mask):
-    """二值掩码 → COCO 未压缩 RLE（列主序，背景开头，偶数条，以背景结尾）。"""
+    """二值掩码 → COCO 未压缩 RLE（列主序，游程以背景 0 开头、交替，条目数为偶数）。"""
     h, w = mask.shape
     flat = (mask > 0).astype(np.uint8).flatten(order="F")
     counts = []
@@ -73,7 +73,7 @@ def _mask_to_rle(mask):
             prev = v
             run = 1
     counts.append(run)
-    if prev == 1 or len(counts) % 2 == 1:
+    if len(counts) % 2 == 1:
         counts.append(0)
     return {"counts": counts, "size": [h, w]}
 
@@ -137,12 +137,13 @@ def _build_coco(items, labels):
         images.append({"id": img.id, "file_name": img.file_name,
                        "width": img.width, "height": img.height})
         shapes = (data or {}).get("shapes", [])
+        label_status = (data or {}).get("labelStatus", {})
         by_label = {}
         for s in shapes:
             by_label.setdefault(s.get("label"), []).append(s)
         for label in labels:
             ann_shapes = by_label.get(label.name, [])
-            if not ann_shapes:
+            if label_status.get(label.name) != "present" or not ann_shapes:
                 continue
             seg = []
             outer_polys = []
@@ -206,7 +207,8 @@ def _build_labelme(img, data):
 
 def _scope_name(db, scope, image_id, batch_id, images):
     if scope == "image":
-        return f"image-{os.path.splitext(images[0].file_name)[0]}"
+        stem = os.path.splitext(images[0].file_name)[0] if images else "unknown"
+        return f"image-{stem}"
     if scope == "batch":
         batch = db.query(Batch).filter(Batch.id == batch_id).first()
         return f"batch-{batch.name if batch else 'unknown'}"
