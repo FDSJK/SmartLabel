@@ -88,7 +88,7 @@ export default function ExportDialog() {
               图像 {result.imageCount} · 标注 {result.annotationCount} · mask {result.maskCount}
             </p>
             {result.pending.length > 0 && (
-              <p className={styles.warn}>跳过 {result.pending.length} 个未确认标签</p>
+              <p className={styles.warn}>跳过未确认标签（涉及 {result.pending.length} 张图）</p>
             )}
             {result.errors.length > 0 && (
               <p className={styles.warn}>
