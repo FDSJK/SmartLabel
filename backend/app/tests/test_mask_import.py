@@ -98,6 +98,60 @@ def test_import_skips_nonempty_annotation(client, tmp_work_dir):
     db.close()
 
 
+def test_import_backfills_absent_for_existing_annotation(client, tmp_work_dir):
+    token = _admin_token(client)
+    _make_image(tmp_work_dir)
+    client.post("/api/batches/scan", headers=_auth(token))
+
+    # 已有 shapes 的 sidecar JSON（cat present），dog 为全黑 mask
+    annot_dir = os.path.join(tmp_work_dir, "batches", "b1", "annotations")
+    os.makedirs(annot_dir)
+    with open(os.path.join(annot_dir, "a.json"), "w") as f:
+        json.dump({"version": 5, "shapes": [{"id": "x", "label": "cat",
+                  "shapeType": "polygon", "points": [[0, 0], [1, 0], [1, 1]]}],
+                  "labelStatus": {"cat": "present"}}, f)
+    _make_mask(tmp_work_dir, label="cat", val=255)   # 非全黑
+    _make_mask(tmp_work_dir, label="dog", val=0)     # 全黑 → 应补 absent
+
+    from app.models.batch import Batch
+    db = _session()
+    batch = db.query(Batch).filter(Batch.name == "b1").one()
+    result = import_batch_masks(tmp_work_dir, batch, db, username="test")
+    assert result["skipped"] == 1
+    assert result["imported"] == 0
+
+    data = json.load(open(os.path.join(annot_dir, "a.json")))
+    assert data["version"] == 6  # 补标触发 +1
+    assert data["labelStatus"] == {"cat": "present", "dog": "absent"}
+    assert len(data["shapes"]) == 1  # 原有 shape 未动
+    assert data["shapes"][0]["label"] == "cat"
+    db.close()
+
+
+def test_import_backfills_pending_to_absent(client, tmp_work_dir):
+    token = _admin_token(client)
+    _make_image(tmp_work_dir)
+    client.post("/api/batches/scan", headers=_auth(token))
+
+    annot_dir = os.path.join(tmp_work_dir, "batches", "b1", "annotations")
+    os.makedirs(annot_dir)
+    with open(os.path.join(annot_dir, "a.json"), "w") as f:
+        json.dump({"version": 5, "shapes": [{"id": "x", "label": "cat",
+                  "shapeType": "polygon", "points": [[0, 0], [1, 0], [1, 1]]}],
+                  "labelStatus": {"cat": "present", "dog": "pending"}}, f)
+    _make_mask(tmp_work_dir, label="cat", val=255)
+    _make_mask(tmp_work_dir, label="dog", val=0)  # 全黑，但旧状态是 pending
+
+    from app.models.batch import Batch
+    db = _session()
+    batch = db.query(Batch).filter(Batch.name == "b1").one()
+    import_batch_masks(tmp_work_dir, batch, db, username="test")
+
+    data = json.load(open(os.path.join(annot_dir, "a.json")))
+    assert data["labelStatus"] == {"cat": "present", "dog": "absent"}
+    db.close()
+
+
 def test_import_logs_size_mismatch(client, tmp_work_dir):
     token = _admin_token(client)
     _make_image(tmp_work_dir, size=64)

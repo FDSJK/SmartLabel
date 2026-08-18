@@ -136,6 +136,47 @@ def import_image_masks(work_dir: str, batch: Batch, image: Image, db: Session) -
     return result
 
 
+def _backfill_absent(work_dir: str, batch_name: str, file_name: str, data: dict) -> dict | None:
+    """对已有标注的图补标：全黑 mask 且当前无 shapes、状态缺失或为 pending 的标签 → absent。
+
+    只补「缺失/pending」的标签，不覆盖已有的 present/absent，也不动有 shapes 的标签。
+    返回新的 labelStatus（若有变化），否则返回 None（无需写盘）。
+    """
+    masks_dir = os.path.join(work_dir, "batches", batch_name, "masks")
+    if not os.path.isdir(masks_dir):
+        return None
+    stem = os.path.splitext(file_name)[0]
+    existing_status = dict(data.get("labelStatus", {}))
+    labels_with_shapes = {s.get("label") for s in data.get("shapes", [])}
+    changed = False
+
+    for label_name in sorted(os.listdir(masks_dir)):
+        subdir = os.path.join(masks_dir, label_name)
+        if not os.path.isdir(subdir):
+            continue
+        mask_path = None
+        for ext in MASK_EXTENSIONS:
+            candidate = os.path.join(subdir, stem + ext)
+            if os.path.isfile(candidate):
+                mask_path = candidate
+                break
+        if mask_path is None:
+            continue
+        if label_name in labels_with_shapes:
+            continue  # 有 shapes → present，不动
+        if existing_status.get(label_name) not in (None, "pending"):
+            continue  # 已有 present/absent，尊重现状
+        try:
+            polygons = vectorize_mask(mask_path)
+        except Exception:
+            continue
+        if not polygons:
+            existing_status[label_name] = "absent"
+            changed = True
+
+    return existing_status if changed else None
+
+
 def import_batch_masks(work_dir: str, batch: Batch, db: Session, username: str = "system") -> dict:
     """为批次中所有空标注图像导入 mask，写 sidecar JSON 并同步 annotation_rev。"""
     result = {"imported": 0, "skipped": 0, "errors": [], "created_labels": []}
@@ -149,6 +190,21 @@ def import_batch_masks(work_dir: str, batch: Batch, db: Session, username: str =
             result["skipped"] += 1
             continue
         if data and data.get("shapes"):
+            # 已标注的图不重导 shapes，只补标全黑 mask 对应标签的 absent
+            updated_status = _backfill_absent(work_dir, batch.name, image.file_name, data)
+            if updated_status is not None:
+                saved = write_annotation(
+                    work_dir=work_dir,
+                    batch_name=batch.name,
+                    file_name=image.file_name,
+                    shapes=data.get("shapes", []),
+                    label_status=updated_status,
+                    image_width=image.width,
+                    image_height=image.height,
+                    username=username,
+                    current_version=data.get("version", 0),
+                )
+                image.annotation_rev = saved["version"]
             result["skipped"] += 1
             continue
 
