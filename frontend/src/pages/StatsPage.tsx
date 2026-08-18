@@ -139,10 +139,15 @@ export default function StatsPage() {
           </table>
 
           <div className={styles.chart}>
-            <ResponsiveContainer width="100%" height={Math.max(200, visibleLabels.length * 28)}>
+            <ResponsiveContainer width="100%" height={Math.max(200, visibleLabels.length * 36)}>
               <BarChart layout="vertical" data={visibleLabels} margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
                 <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" width={150} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={180}
+                  tickFormatter={(name: string) => (name.length > 18 ? `${name.slice(0, 17)}…` : name)}
+                />
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="present" name="阳性" stackId="a" fill={CHART_COLORS.present} />
