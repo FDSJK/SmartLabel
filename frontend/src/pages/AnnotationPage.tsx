@@ -20,6 +20,7 @@ export default function AnnotationPage() {
   const toggleLeftPanel = useUIStore(s => s.toggleLeftPanel);
   const toggleRightPanel = useUIStore(s => s.toggleRightPanel);
   const exportOpen = useUIStore(s => s.exportDialogOpen);
+  const openExportDialog = useUIStore(s => s.openExportDialog);
 
   // Init: load labels
   useEffect(() => {
@@ -160,6 +161,11 @@ export default function AnnotationPage() {
           {!leftCollapsed && (
             <div className={styles.body}>
               <BatchSelector />
+              <div className={styles.exportBar}>
+                <button className={styles.exportBtn} onClick={openExportDialog}>
+                  ⇩ 导出标注
+                </button>
+              </div>
               <ImageList />
             </div>
           )}

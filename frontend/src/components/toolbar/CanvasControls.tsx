@@ -25,7 +25,6 @@ export default function CanvasControls() {
   const labelStatus = useEditorStore(s => s.labelStatus);
   const shapes = useEditorStore(s => s.shapes);
   const labels = useLabelStore(s => s.labels);
-  const openExportDialog = useUIStore(s => s.openExportDialog);
   const [maskStatus, setMaskStatus] = useState<'idle' | 'exporting' | 'done' | 'error'>('idle');
   const [maskError, setMaskError] = useState<string | null>(null);
 
@@ -104,13 +103,6 @@ export default function CanvasControls() {
           {maskStatus === 'done' ? '已保存 mask' : maskStatus === 'error' ? (maskError ?? '保存 mask 失败') : '保存 mask'}
         </span>
       </button>
-
-      <span className={styles.sep} />
-      <button className={styles.btn} onClick={openExportDialog}>
-        ⤓
-        <span className={styles.tooltip}>导出标注</span>
-      </button>
-
       <SaveIndicator />
     </div>
   );

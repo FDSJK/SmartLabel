@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -13,12 +13,12 @@
   max-width: 90vw;
   max-height: 85vh;
   overflow: auto;
-  background: #171a1f;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   padding: 20px;
-  color: #e6e9ed;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
 }
 
 .title {
@@ -41,7 +41,7 @@
 
 .label {
   font-size: 12px;
-  color: #c2c8cf;
+  color: var(--color-text-muted);
 }
 
 .radio,
@@ -51,6 +51,11 @@
   gap: 6px;
   font-size: 13px;
   cursor: pointer;
+}
+
+.radio input,
+.check input {
+  accent-color: var(--color-primary);
 }
 
 .actions {
@@ -63,39 +68,48 @@
 .primary,
 .secondary {
   padding: 6px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .primary {
-  background: #3388ff;
+  background: var(--color-primary);
   color: #fff;
-  border-color: transparent;
+  border: 1px solid var(--color-primary);
+}
+
+.primary:hover {
+  background: var(--color-primary-hover);
 }
 
 .primary:disabled {
-  background: #2a3a4f;
-  color: rgba(255, 255, 255, 0.4);
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
   cursor: default;
 }
 
 .secondary {
   background: transparent;
-  color: #e6e9ed;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.secondary:hover {
+  background: var(--color-bg);
 }
 
 .success {
-  color: #4caf7d;
+  color: var(--color-success);
 }
 
 .warn {
-  color: #e6b84c;
+  color: var(--color-warning);
 }
 
 .stats {
-  color: #c2c8cf;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -103,5 +117,5 @@
   margin: 0;
   padding-left: 18px;
   font-size: 12px;
-  color: #e6b84c;
+  color: var(--color-warning);
 }
