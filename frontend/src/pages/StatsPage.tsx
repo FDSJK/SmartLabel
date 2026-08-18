@@ -1,3 +1,3 @@
 export default function StatsPage() {
-  return <div>Stats</div>;
+  return <div style={{ padding: 24 }}>Stats</div>;
 }
