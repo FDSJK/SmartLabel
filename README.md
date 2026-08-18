@@ -16,63 +16,123 @@ ling-auto-label/
 ├── backend/            # FastAPI 后端（app/ 包 + pyproject.toml + 测试）
 ├── frontend/           # React + Vite 前端
 ├── docs/               # 使用指南、设计文档
-├── .venv/              # Python 虚拟环境（需自行创建）
-└── data/               # 默认数据目录（SQLite 数据库；已被 .gitignore 忽略）
+├── .venv/              # Python 虚拟环境（部署时自行创建，git 忽略）
+└── data/               # 默认数据目录（SQLite 数据库，git 忽略）
 ```
 
 ## 环境要求
 
 - Python 3.11 或更高
 - Node.js 18 或更高（含 npm）
-- 无需预装数据库——SQLite 随数据目录自动创建
+- 无需预装数据库——SQLite 随首次启动自动创建
 
-## 本地启动
+---
 
-### 1. 安装后端依赖
+## 完整部署步骤（从拉取代码开始）
 
-在仓库根目录创建虚拟环境并安装：
+### 第 1 步：拉取代码
 
 ```bash
+git clone https://github.com/FDSJK/SmartLabel.git
+cd SmartLabel
+```
+
+> 克隆下来的目录名为 `SmartLabel`，下文以它为准。
+
+### 第 2 步：创建虚拟环境并安装后端依赖
+
+```bash
+# 在仓库根目录（SmartLabel/）下执行
 python3 -m venv .venv
+.venv/bin/pip install --upgrade pip
 .venv/bin/pip install -e "backend[dev]"
 ```
 
-> `[dev]` 附带 pytest / httpx 等测试依赖；仅运行可去掉 `[dev]`。
+- `-e`：以可编辑模式安装本地包 `ling-label-backend`。
+- `[dev]`：附带 pytest / httpx 等测试依赖；**生产环境可去掉 `[dev]`**，只装运行依赖。
 
-### 2. 启动后端（端口 8080）
+### 第 3 步：配置环境变量
+
+后端通过环境变量配置（前缀 `LING_`）。**最重要的必做项是 `LING_SECRET_KEY`**——它是给登录令牌（JWT）签名/验签的密钥，默认值公开可见，不修改则他人可伪造登录令牌。
+
+1. **生成一个随机密钥（只生成一次，之后固定复用）**：
+
+   ```bash
+   openssl rand -hex 32
+   # 例如输出：3f9a2c...（复制这一串）
+   ```
+
+2. **设置它**（二选一）：
+
+   - **临时**（当前终端有效）：启动后端前执行
+
+     ```bash
+     export LING_SECRET_KEY="<上一步生成的字符串>"
+     ```
+
+   - **持久**（推荐）：写入 shell 配置文件 `~/.zshrc` 或 `~/.bashrc`
+
+     ```bash
+     echo 'export LING_SECRET_KEY="<上一步生成的字符串>"' >> ~/.zshrc
+     source ~/.zshrc
+     ```
+
+3. 其他可选变量（需要时再设）：
+
+   ```bash
+   export LING_WORK_DIR=/srv/ling-label/data   # 数据库文件位置，默认 ./data
+   export LING_ACCESS_TOKEN_EXPIRE_MINUTES=480 # 登录有效期（分钟），默认 480
+   ```
+
+> **重要**：目前后端**不读取 `.env` 文件**，只认真正的 shell 环境变量，所以必须用 `export`（或部署脚本、systemd 的 `Environment=`）。
+> 另外：密钥一旦确定就**不要每次启动都重新生成**，否则旧登录令牌会全部失效、所有用户被踢下线。
+
+### 第 4 步：启动后端（端口 8080）
 
 ```bash
 cd backend
-../.venv/bin/uvicorn app.main:app --reload --port 8080
+../.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
-首次启动会自动创建 SQLite 数据库并写入默认管理员账号。
+- `--host 0.0.0.0`：允许局域网其他机器访问（仅本机使用可去掉）。
+- 开发调试可加 `--reload`（代码改动自动重载，生产勿用）。
 
-### 3. 启动前端（端口 5173）
+首次启动会自动创建 SQLite 数据库（`metadata.db`）并写入默认管理员账号，日志会正常输出无报错即启动成功。
+
+### 第 5 步：安装并启动前端（端口 5173）
+
+另开一个终端：
 
 ```bash
-cd frontend
+cd ../frontend
 npm install
-npm run dev
+npm run dev -- --host 0.0.0.0
 ```
 
-浏览器打开 **http://localhost:5173**。
+- `--host 0.0.0.0`：让局域网其他机器能访问前端；仅本机访问可去掉。
+- 开发模式下 Vite 会把 `/api` 请求代理到后端 `http://localhost:8080`（见 `frontend/vite.config.ts`）。
 
-开发模式下 Vite 会把 `/api` 请求代理到 `http://localhost:8080`（见 `frontend/vite.config.ts`）。
+浏览器访问：
 
-### 4. 登录
+- 本机：http://localhost:5173
+- 局域网其他机器：http://<服务器IP>:5173
 
-默认管理员账号（后端首次启动时自动创建）：
+### 第 6 步：登录并初始化
 
-| 用户名 | 密码 |
-| --- | --- |
-| `admin` | `admin` |
+1. 用默认管理员账号登录：
 
-> 生产环境请登录后立即修改默认密码。
+   | 用户名 | 密码 |
+   | --- | --- |
+   | `admin` | `admin` |
 
-## 环境变量
+2. 登录后**立即修改默认密码**。
+3. （可选）在「系统设置」页设置**工作目录**——决定标注数据（批次/图像/标注）落盘位置，见下文「数据目录说明」。
 
-后端通过环境变量配置，均带 `LING_` 前缀（见 `backend/app/core/config.py`）：
+---
+
+## 环境变量参考
+
+后端通过环境变量配置，均带 `LING_` 前缀（定义在 `backend/app/core/config.py`）：
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -81,43 +141,6 @@ npm run dev
 | `LING_ALGORITHM` | `HS256` | JWT 签名算法 |
 | `LING_ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | 登录令牌有效期（分钟） |
 
-示例：
-
-```bash
-export LING_WORK_DIR=/srv/ling-label/data
-export LING_SECRET_KEY="$(openssl rand -hex 32)"
-```
-
-### 设置 LING_SECRET_KEY（生产环境必做）
-
-`LING_SECRET_KEY` 是给登录令牌（JWT）签名和验签的密钥。默认值 `dev-secret-change-in-production`
-写在代码里、公开可见，**部署前必须换成随机的秘密字符串**，否则他人可伪造登录令牌绕过登录。
-
-生成一个随机密钥：
-
-```bash
-openssl rand -hex 32
-```
-
-设置方式（二选一）：
-
-1. **临时**——启动前在 shell 里 `export`：
-
-   ```bash
-   export LING_SECRET_KEY="$(openssl rand -hex 32)"
-   ```
-
-2. **持久**——在后端运行目录（`backend/`，即启动 uvicorn 的位置）放一个 `.env` 文件：
-
-   ```
-   LING_SECRET_KEY=你的随机字符串
-   ```
-
-注意：
-
-- 修改密钥后，**旧的登录令牌全部失效**，所有用户需重新登录。
-- 多实例部署时，所有后端实例必须使用**同一个** `LING_SECRET_KEY`。
-
 ## 数据目录说明（两个「工作目录」）
 
 系统里有两个容易混淆的「工作目录」概念，部署时要分清：
@@ -125,25 +148,27 @@ openssl rand -hex 32
 1. **环境变量 `LING_WORK_DIR`**：决定 **SQLite 数据库文件 `metadata.db`** 放在哪里（后端启动时创建）。
 2. **「系统设置」页里的工作目录**：决定**标注数据**（批次、图像、标注 JSON）放在哪里，由管理员在网页界面设置，存于数据库 `settings` 表（`WORK_DIR`），未设置时回退到环境变量 `LING_WORK_DIR`。
 
-## 局域网 / 生产部署
+> 修改 `LING_WORK_DIR` 相当于「换数据库文件的位置」：如果新目录没有旧数据库，后端会新建一个**空库**（之前的用户、批次都看不到）。要么在首次启动前就设好，要么把旧的 `metadata.db` 一起搬过去。
 
-### 方式一：反向代理（推荐）
+## 生产 / 局域网部署（反向代理）
 
-1. **后端**（去掉 `--reload`，监听所有网卡）：
+开发模式（`npm run dev`）适合调试；正式部署建议把前端构建成静态文件，用 Nginx 统一托管并反代后端。
+
+1. **后端**（去掉 `--reload`）：
 
    ```bash
    cd backend
    ../.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
    ```
 
-2. **前端**构建出静态文件：
+2. **前端构建**：
 
    ```bash
    cd frontend
    npm run build    # 产物在 frontend/dist/
    ```
 
-3. 用 Nginx 等反向代理同时托管前端静态文件，并把 `/api` 转发到后端：
+3. **Nginx** 托管静态文件并把 `/api` 转发到后端：
 
    ```nginx
    server {
@@ -162,21 +187,9 @@ openssl rand -hex 32
    }
    ```
 
-   前端请求 `/api` 为相对路径（见 `frontend/src/api/client.ts`），经同源反代后无需改动前端配置。
+   前端请求 `/api` 为相对路径（`frontend/src/api/client.ts`），经同源反代后无需改动前端配置。
 
-### 方式二：开发模式直接暴露（临时/小团队）
-
-```bash
-# 后端
-cd backend && ../.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
-
-# 前端（--host 使局域网可访问）
-cd frontend && npm run dev -- --host 0.0.0.0
-```
-
-局域网用户访问 `http://<服务器IP>:5173`。
-
-> 注意：后端 CORS 当前固定允许 `http://localhost:5173`（`backend/app/main.py`）。若前后端不同源访问，需相应调整 `allow_origins`。
+> 后端 CORS 当前固定允许 `http://localhost:5173`（`backend/app/main.py`）。经 Nginx 或 Vite 反代时浏览器请求为同源，通常无需改；只有前后端**直接跨源**访问时才需调整 `allow_origins`。
 
 ## 运行测试
 
