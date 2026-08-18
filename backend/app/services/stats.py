@@ -1,5 +1,3 @@
-import json
-
 from app.models.batch import Batch
 from app.models.image import Image
 from app.models.label import Label
@@ -23,9 +21,9 @@ def compute_stats(work_dir: str, db, batch_id: int | None = None) -> dict:
             continue
         try:
             data = read_annotation(work_dir, batch_name, img.file_name)
-        except (json.JSONDecodeError, OSError):
+        except (ValueError, OSError):
             data = None
-        status = (data or {}).get("labelStatus", {})
+        status = data.get("labelStatus", {}) if isinstance(data, dict) else {}
         for label in labels:
             v = status.get(label.name)
             if v == "present":

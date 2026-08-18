@@ -51,6 +51,22 @@ def _seed(tmp_work_dir):
         json.dump({"version": 1, "shapes": [], "labelStatus": {"cat": "absent", "dog": "pending"}}, f)
     # a2 无 sidecar → 全部 pending
 
+    # 批次 b2：1 张图，cat/dog 均 present（用于验证批次隔离）
+    from app.models.batch import Batch as _Batch
+    from app.models.image import Image as _Image
+    db = _session()
+    b2 = _Batch(name="b2", source="upload")
+    db.add(b2)
+    db.commit()
+    db.add(_Image(batch_id=b2.id, file_name="b0.png",
+                  src_rel_path="batches/b2/images/b0.png", width=20, height=20, channels=3))
+    db.commit()
+    db.close()
+    annot_dir2 = os.path.join(tmp_work_dir, "batches", "b2", "annotations")
+    os.makedirs(annot_dir2)
+    with open(os.path.join(annot_dir2, "b0.json"), "w") as f:
+        json.dump({"version": 1, "shapes": [], "labelStatus": {"cat": "present", "dog": "present"}}, f)
+
 
 def _batch_id():
     from app.models.batch import Batch
@@ -65,10 +81,10 @@ def test_compute_stats_global(client, tmp_work_dir):
     db = _session()
     result = compute_stats(tmp_work_dir, db, None)
     db.close()
-    assert result["total_images"] == 3
+    assert result["total_images"] == 4
     by_name = {l["name"]: l for l in result["labels"]}
-    assert by_name["cat"] == {"name": "cat", "present": 1, "absent": 1, "pending": 1}
-    assert by_name["dog"] == {"name": "dog", "present": 0, "absent": 1, "pending": 2}
+    assert by_name["cat"] == {"name": "cat", "present": 2, "absent": 1, "pending": 1}
+    assert by_name["dog"] == {"name": "dog", "present": 1, "absent": 1, "pending": 2}
 
 
 def test_compute_stats_batch(client, tmp_work_dir):
@@ -76,9 +92,10 @@ def test_compute_stats_batch(client, tmp_work_dir):
     db = _session()
     result = compute_stats(tmp_work_dir, db, _batch_id())
     db.close()
-    assert result["total_images"] == 3
+    assert result["total_images"] == 3  # 只含 b1，不含 b2
     by_name = {l["name"]: l for l in result["labels"]}
-    assert by_name["cat"]["present"] == 1
+    assert by_name["cat"]["present"] == 1  # b2 的 cat present 不计入
+    assert by_name["dog"]["present"] == 0
 
 
 def test_stats_endpoint(client, tmp_work_dir):
@@ -87,9 +104,13 @@ def test_stats_endpoint(client, tmp_work_dir):
     res = client.get("/api/stats", headers=_auth(token))
     assert res.status_code == 200
     body = res.json()
-    assert body["totalImages"] == 3
-    assert len(body["labels"]) == 2
+    assert body["totalImages"] == 4
+    by_name = {l["name"]: l for l in body["labels"]}
+    assert by_name["cat"] == {"name": "cat", "present": 2, "absent": 1, "pending": 1}
 
     res2 = client.get(f"/api/stats?batch_id={_batch_id()}", headers=_auth(token))
     assert res2.status_code == 200
-    assert res2.json()["totalImages"] == 3
+    body2 = res2.json()
+    assert body2["totalImages"] == 3
+    by_name2 = {l["name"]: l for l in body2["labels"]}
+    assert by_name2["cat"]["present"] == 1
