@@ -19,6 +19,8 @@ interface ImageState {
   startHeartbeat: (imageId: number) => void;
   stopHeartbeat: () => void;
   clearImage: () => void;
+  goPrevImage: () => void;
+  goNextImage: () => void;
 }
 
 export const useImageStore = create<ImageState>((set, get) => ({
@@ -129,5 +131,21 @@ export const useImageStore = create<ImageState>((set, get) => ({
     get().stopHeartbeat();
     useEditorStore.getState().reset();
     set({ currentImage: null, loading: false, lockedByMe: false });
+  },
+
+  goPrevImage: () => {
+    const { currentImage, loading } = get();
+    if (!currentImage || loading) return;
+    const images = useBatchStore.getState().images;
+    const idx = images.findIndex(i => i.id === currentImage.id);
+    if (idx > 0) get().loadImage(images[idx - 1].id);
+  },
+
+  goNextImage: () => {
+    const { currentImage, loading } = get();
+    if (!currentImage || loading) return;
+    const images = useBatchStore.getState().images;
+    const idx = images.findIndex(i => i.id === currentImage.id);
+    if (idx >= 0 && idx < images.length - 1) get().loadImage(images[idx + 1].id);
   },
 }));

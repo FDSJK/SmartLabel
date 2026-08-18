@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useImageStore } from '../../stores/imageStore';
+import { useBatchStore } from '../../stores/batchStore';
 import { useLabelStore } from '../../stores/labelStore';
 import { exportImageMask } from '../../api/masks';
 import SaveIndicator from './SaveIndicator';
@@ -25,11 +26,19 @@ export default function CanvasControls() {
   const labelStatus = useEditorStore(s => s.labelStatus);
   const shapes = useEditorStore(s => s.shapes);
   const labels = useLabelStore(s => s.labels);
+  const images = useBatchStore(s => s.images);
+  const loadingImage = useImageStore(s => s.loading);
+  const goPrevImage = useImageStore(s => s.goPrevImage);
+  const goNextImage = useImageStore(s => s.goNextImage);
   const [maskStatus, setMaskStatus] = useState<'idle' | 'exporting' | 'done' | 'error'>('idle');
   const [maskError, setMaskError] = useState<string | null>(null);
 
   const hasPresentOrAbsent = Object.values(labelStatus).some(v => v === 'present' || v === 'absent');
   const canExport = currentImage !== null && lockedByMe && hasPresentOrAbsent;
+
+  const imageIndex = currentImage ? images.findIndex(i => i.id === currentImage.id) : -1;
+  const hasPrev = imageIndex > 0;
+  const hasNext = imageIndex >= 0 && imageIndex < images.length - 1;
 
   async function handleExportMask() {
     if (!currentImage) return;
@@ -62,6 +71,28 @@ export default function CanvasControls() {
 
   return (
     <div className={styles.bar}>
+      <button
+        className={styles.btn}
+        disabled={!hasPrev || loadingImage}
+        onClick={goPrevImage}
+      >
+        ‹
+        <span className={styles.tooltip}>上一张 ←</span>
+      </button>
+      <span className={styles.metric}>
+        {currentImage && imageIndex >= 0 ? `${imageIndex + 1}/${images.length}` : '-'}
+      </span>
+      <button
+        className={styles.btn}
+        disabled={!hasNext || loadingImage}
+        onClick={goNextImage}
+      >
+        ›
+        <span className={styles.tooltip}>下一张 →</span>
+      </button>
+
+      <span className={styles.sep} />
+
       <button
         className={styles.btn}
         disabled={undoStackLen === 0}

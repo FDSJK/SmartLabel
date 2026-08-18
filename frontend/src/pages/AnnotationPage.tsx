@@ -103,6 +103,19 @@ export default function AnnotationPage() {
       return;
     }
 
+    // Arrow keys — previous/next image (ignore while drawing a polygon)
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      if (store.drawingPoints === null) {
+        e.preventDefault();
+        if (e.key === 'ArrowLeft') {
+          useImageStore.getState().goPrevImage();
+        } else {
+          useImageStore.getState().goNextImage();
+        }
+      }
+      return;
+    }
+
     // Tool shortcuts: P, F, S, A, X
     const key = e.key.toLowerCase();
     if (key === 'p') {
