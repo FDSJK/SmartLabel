@@ -4,6 +4,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public detail: string,
+    public body?: unknown,
   ) {
     super(detail);
     this.name = 'ApiError';
@@ -29,12 +30,24 @@ class ApiClient {
     return h;
   }
 
+  private async _raise(res: Response): Promise<never> {
+    const body: unknown = await res.json().catch(() => null);
+    const detail = this._detail(body, res.statusText);
+    throw new ApiError(res.status, detail, body);
+  }
+
+  private _detail(body: unknown, fallback: string): string {
+    if (body && typeof body === 'object' && 'detail' in body) {
+      const d = (body as { detail: unknown }).detail;
+      if (typeof d === 'string') return d;
+      if (d != null) return JSON.stringify(d);
+    }
+    return fallback;
+  }
+
   async get<T>(path: string): Promise<T> {
     const res = await fetch(`${BASE_URL}${path}`, { headers: this.headers() });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new ApiError(res.status, err.detail);
-    }
+    if (!res.ok) return this._raise(res);
     return res.json();
   }
 
@@ -44,10 +57,7 @@ class ApiClient {
       headers: this.headers(),
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new ApiError(res.status, err.detail);
-    }
+    if (!res.ok) return this._raise(res);
     return res.json();
   }
 
@@ -57,10 +67,7 @@ class ApiClient {
       headers: this.headers(),
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new ApiError(res.status, err.detail);
-    }
+    if (!res.ok) return this._raise(res);
     return res.json();
   }
 
@@ -69,10 +76,7 @@ class ApiClient {
       method: 'DELETE',
       headers: this.headers(),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new ApiError(res.status, err.detail);
-    }
+    if (!res.ok) return this._raise(res);
   }
 
   async uploadFiles<T>(path: string, files: File[]): Promise<T> {
@@ -87,10 +91,7 @@ class ApiClient {
       headers: h,
       body: formData,
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new ApiError(res.status, err.detail);
-    }
+    if (!res.ok) return this._raise(res);
     return res.json();
   }
 }
