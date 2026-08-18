@@ -88,6 +88,36 @@ export LING_WORK_DIR=/srv/ling-label/data
 export LING_SECRET_KEY="$(openssl rand -hex 32)"
 ```
 
+### 设置 LING_SECRET_KEY（生产环境必做）
+
+`LING_SECRET_KEY` 是给登录令牌（JWT）签名和验签的密钥。默认值 `dev-secret-change-in-production`
+写在代码里、公开可见，**部署前必须换成随机的秘密字符串**，否则他人可伪造登录令牌绕过登录。
+
+生成一个随机密钥：
+
+```bash
+openssl rand -hex 32
+```
+
+设置方式（二选一）：
+
+1. **临时**——启动前在 shell 里 `export`：
+
+   ```bash
+   export LING_SECRET_KEY="$(openssl rand -hex 32)"
+   ```
+
+2. **持久**——在后端运行目录（`backend/`，即启动 uvicorn 的位置）放一个 `.env` 文件：
+
+   ```
+   LING_SECRET_KEY=你的随机字符串
+   ```
+
+注意：
+
+- 修改密钥后，**旧的登录令牌全部失效**，所有用户需重新登录。
+- 多实例部署时，所有后端实例必须使用**同一个** `LING_SECRET_KEY`。
+
 ## 数据目录说明（两个「工作目录」）
 
 系统里有两个容易混淆的「工作目录」概念，部署时要分清：
