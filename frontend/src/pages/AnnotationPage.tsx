@@ -4,6 +4,7 @@ import ImageList from '../components/panels/ImageList';
 import KonvaStage from '../components/canvas/KonvaStage';
 import RightPanel from '../components/panels/RightPanel';
 import CanvasControls from '../components/toolbar/CanvasControls';
+import ExportDialog from '../components/panels/ExportDialog';
 import { useLabelStore } from '../stores/labelStore';
 import { useEditorStore } from '../stores/editorStore';
 import { useImageStore } from '../stores/imageStore';
@@ -18,6 +19,7 @@ export default function AnnotationPage() {
   const rightCollapsed = useUIStore(s => s.rightPanelCollapsed);
   const toggleLeftPanel = useUIStore(s => s.toggleLeftPanel);
   const toggleRightPanel = useUIStore(s => s.toggleRightPanel);
+  const exportOpen = useUIStore(s => s.exportDialogOpen);
 
   // Init: load labels
   useEffect(() => {
@@ -187,6 +189,8 @@ export default function AnnotationPage() {
           )}
         </aside>
       </div>
+
+      {exportOpen && <ExportDialog />}
     </div>
   );
 }

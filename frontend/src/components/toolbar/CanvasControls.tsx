@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useImageStore } from '../../stores/imageStore';
+import { useLabelStore } from '../../stores/labelStore';
 import { exportImageMask } from '../../api/masks';
 import SaveIndicator from './SaveIndicator';
 import styles from './CanvasControls.module.css';
@@ -23,6 +24,8 @@ export default function CanvasControls() {
   const lockedByMe = useImageStore(s => s.lockedByMe);
   const labelStatus = useEditorStore(s => s.labelStatus);
   const shapes = useEditorStore(s => s.shapes);
+  const labels = useLabelStore(s => s.labels);
+  const openExportDialog = useUIStore(s => s.openExportDialog);
   const [maskStatus, setMaskStatus] = useState<'idle' | 'exporting' | 'done' | 'error'>('idle');
   const [maskError, setMaskError] = useState<string | null>(null);
 
@@ -31,9 +34,10 @@ export default function CanvasControls() {
 
   async function handleExportMask() {
     if (!currentImage) return;
-    const pending = Object.entries(labelStatus)
-      .filter(([, v]) => v === 'pending')
-      .map(([k]) => k);
+    // 与右侧「标签状态」面板显示一致：缺失条目的标签也视为待定（面板用 || 'pending' 兜底显示）
+    const pending = labels
+      .filter(l => l.enabled && (labelStatus[l.name] ?? 'pending') === 'pending')
+      .map(l => l.name);
     if (pending.length > 0) {
       const ok = window.confirm(`存在待定标签：${pending.join('、')}。是否忽略待定标签继续保存？`);
       if (!ok) return;
@@ -100,6 +104,13 @@ export default function CanvasControls() {
           {maskStatus === 'done' ? '已保存 mask' : maskStatus === 'error' ? (maskError ?? '保存 mask 失败') : '保存 mask'}
         </span>
       </button>
+
+      <span className={styles.sep} />
+      <button className={styles.btn} onClick={openExportDialog}>
+        ⤓
+        <span className={styles.tooltip}>导出标注</span>
+      </button>
+
       <SaveIndicator />
     </div>
   );

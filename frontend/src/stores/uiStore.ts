@@ -11,6 +11,7 @@ interface UIState {
   saveStatus: SaveStatus;
   leftPanelCollapsed: boolean;
   rightPanelCollapsed: boolean;
+  exportDialogOpen: boolean;
 
   setTransform: (zoom: number, offsetX: number, offsetY: number) => void;
   fitToScreen: (imageWidth: number, imageHeight: number, viewWidth: number, viewHeight: number) => void;
@@ -20,6 +21,8 @@ interface UIState {
   setSaveStatus: (status: SaveStatus) => void;
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
+  openExportDialog: () => void;
+  closeExportDialog: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -32,6 +35,7 @@ export const useUIStore = create<UIState>((set) => ({
   saveStatus: 'saved',
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
+  exportDialogOpen: false,
 
   setTransform: (zoom, offsetX, offsetY) => set({ zoom, offsetX, offsetY }),
 
@@ -52,4 +56,6 @@ export const useUIStore = create<UIState>((set) => ({
   setSaveStatus: (status) => set({ saveStatus: status }),
   toggleLeftPanel: () => set(s => ({ leftPanelCollapsed: !s.leftPanelCollapsed })),
   toggleRightPanel: () => set(s => ({ rightPanelCollapsed: !s.rightPanelCollapsed })),
+  openExportDialog: () => set({ exportDialogOpen: true }),
+  closeExportDialog: () => set({ exportDialogOpen: false }),
 }));
