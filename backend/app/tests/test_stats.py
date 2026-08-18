@@ -114,3 +114,29 @@ def test_stats_endpoint(client, tmp_work_dir):
     assert body2["totalImages"] == 3
     by_name2 = {l["name"]: l for l in body2["labels"]}
     assert by_name2["cat"]["present"] == 1
+
+
+def test_compute_stats_non_dict_label_status(client, tmp_work_dir):
+    from app.models.batch import Batch
+    from app.models.image import Image
+    from app.models.label import Label
+    db = _session()
+    db.add(Batch(name="b3", source="upload"))
+    db.add(Label(name="cat", color="#f00", sort_order=0))
+    db.commit()
+    batch = db.query(Batch).filter(Batch.name == "b3").one()
+    db.add(Image(batch_id=batch.id, file_name="x.png",
+                 src_rel_path="batches/b3/images/x.png", width=20, height=20, channels=3))
+    db.commit()
+    db.close()
+
+    annot_dir = os.path.join(tmp_work_dir, "batches", "b3", "annotations")
+    os.makedirs(annot_dir)
+    with open(os.path.join(annot_dir, "x.json"), "w") as f:
+        json.dump({"version": 1, "shapes": [], "labelStatus": None}, f)
+
+    db = _session()
+    result = compute_stats(tmp_work_dir, db, None)  # 不应抛异常
+    db.close()
+    by_name = {l["name"]: l for l in result["labels"]}
+    assert by_name["cat"] == {"name": "cat", "present": 0, "absent": 0, "pending": 1}

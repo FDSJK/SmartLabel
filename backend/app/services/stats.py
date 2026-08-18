@@ -24,6 +24,8 @@ def compute_stats(work_dir: str, db, batch_id: int | None = None) -> dict:
         except (ValueError, OSError):
             data = None
         status = data.get("labelStatus", {}) if isinstance(data, dict) else {}
+        if not isinstance(status, dict):
+            status = {}
         for label in labels:
             v = status.get(label.name)
             if v == "present":
