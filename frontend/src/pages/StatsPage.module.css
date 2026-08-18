@@ -1,10 +1,21 @@
-.page { padding: 24px; max-width: 900px; }
+.page { padding: 24px; max-width: 1100px; }
 .heading { font-size: 20px; margin-bottom: 16px; }
-.select { margin-bottom: 12px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 14px; min-width: 200px; }
-.total { margin-bottom: 12px; font-size: 14px; }
+.controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.select { padding: 8px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 14px; min-width: 180px; }
+.total { font-size: 14px; }
+.search { padding: 8px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 14px; min-width: 160px; }
+.filterWrap { position: relative; }
+.filterBtn { padding: 8px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); font-size: 14px; cursor: pointer; }
+.filterPanel { position: absolute; top: calc(100% + 4px); right: 0; width: 220px; max-height: 300px; overflow: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); z-index: 10; padding: 8px; }
+.filterActions { display: flex; gap: 12px; margin-bottom: 6px; }
+.linkBtn { background: none; border: none; color: var(--color-primary); font-size: 12px; cursor: pointer; padding: 0; }
+.filterList { display: flex; flex-direction: column; gap: 4px; }
+.filterItem { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
 .hint { color: var(--color-text-muted); font-size: 13px; }
 .error { color: var(--color-danger); font-size: 13px; }
-.table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.table th, .table td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); text-align: left; }
+.layout { display: flex; gap: 24px; align-items: flex-start; }
+.table { flex: 1; min-width: 0; border-collapse: collapse; font-size: 14px; }
+.table th, .table td { padding: 8px 12px; border-bottom: 1px solid var(--color-border); text-align: left; }
 .table th { color: var(--color-text-muted); font-weight: 600; }
 .pending { color: var(--color-warning); }
+.chart { flex: 1; min-width: 320px; }
