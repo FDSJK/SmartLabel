@@ -5,8 +5,8 @@ from app.core.security import hash_password
 from app.models.user import User
 from app.models.image import Image
 from app.models.batch import Batch
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
-from app.api.deps import require_admin
+from app.schemas.user import UserCreate, UserUpdate, UserResponse, WorkDirUpdate
+from app.api.deps import require_admin, get_current_user
 
 router = APIRouter()
 
@@ -17,6 +17,23 @@ def list_users(
     _admin: User = Depends(require_admin),
 ):
     return db.query(User).order_by(User.created_at.desc()).all()
+
+
+@router.get("/users/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.put("/users/me/work_dir", response_model=UserResponse)
+def update_my_work_dir(
+    body: WorkDirUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    current_user.work_dir = body.work_dir
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
 
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -34,7 +51,7 @@ def create_user(
     user = User(
         username=body.username,
         password_hash=hash_password(body.password),
-        role=body.role,
+        role="annotator",
     )
     db.add(user)
     db.commit()
@@ -56,8 +73,6 @@ def update_user(
         user.is_active = body.is_active
     if body.password is not None:
         user.password_hash = hash_password(body.password)
-    if body.role is not None:
-        user.role = body.role
     db.commit()
     db.refresh(user)
     return user
