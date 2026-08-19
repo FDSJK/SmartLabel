@@ -3,9 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.core.db import get_db
-from app.models.image import Image
 from app.models.user import User
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_owned_image
 from app.models.batch import Batch
 from app.schemas.annotation import MaskExportRequest, MaskExportResponse
 from app.services.mask_export import export_image_masks
@@ -26,13 +25,11 @@ MIME_MAP = {
 def serve_image_file(
     image_id: int,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    img = get_owned_image(db, current_user, image_id)
 
-    work_dir = get_work_dir(db, _user)
+    work_dir = get_work_dir(db, current_user)
     rel_path = img.work_rel_path or img.src_rel_path
     abs_path = os.path.join(work_dir, rel_path)
 
@@ -52,9 +49,7 @@ def export_mask(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    img = get_owned_image(db, current_user, image_id)
 
     batch = db.query(Batch).filter(Batch.id == img.batch_id).first()
     if not batch:

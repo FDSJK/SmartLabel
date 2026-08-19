@@ -5,7 +5,7 @@ from PIL import Image as PILImage
 import numpy as np
 
 
-def _admin_token(client: TestClient) -> str:
+def _admin_token(client: TestClient) -> tuple[str, int]:
     from app.core.security import hash_password, create_access_token
     from app.models.user import User
     from app.main import app
@@ -16,14 +16,14 @@ def _admin_token(client: TestClient) -> str:
     db.add(user)
     db.commit()
     db.refresh(user)
-    return create_access_token({"sub": str(user.id)})
+    return create_access_token({"sub": str(user.id)}), user.id
 
 
 def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _setup_image(client: TestClient, token: str) -> tuple[int, str, str, int, int]:
+def _setup_image(client: TestClient, token: str, user_id: int) -> tuple[int, str, str, int, int]:
     """Create a batch + image in DB and on disk. Returns (image_id, batch_name, file_name, width, height)."""
     from app.main import app
     from app.core.db import get_db
@@ -39,7 +39,7 @@ def _setup_image(client: TestClient, token: str) -> tuple[int, str, str, int, in
     db = next(app.dependency_overrides[get_db]())
     batch = db.query(Batch).filter(Batch.name == "test-annot").first()
     if not batch:
-        batch = Batch(name="test-annot", source="upload")
+        batch = Batch(name="test-annot", source="upload", created_by=user_id)
         db.add(batch)
         db.commit()
         db.refresh(batch)
@@ -60,8 +60,8 @@ def _setup_image(client: TestClient, token: str) -> tuple[int, str, str, int, in
 
 class TestGetAnnotation:
     def test_get_empty_annotation(self, client: TestClient):
-        token = _admin_token(client)
-        image_id, _, fname, w, h = _setup_image(client, token)
+        token, user_id = _admin_token(client)
+        image_id, _, fname, w, h = _setup_image(client, token, user_id)
 
         resp = client.get(f"/api/images/{image_id}/annotation", headers=_auth(token))
         assert resp.status_code == 200
@@ -74,15 +74,15 @@ class TestGetAnnotation:
         assert data["imageHeight"] == h
 
     def test_get_annotation_404(self, client: TestClient):
-        token = _admin_token(client)
+        token, _ = _admin_token(client)
         resp = client.get("/api/images/99999/annotation", headers=_auth(token))
         assert resp.status_code == 404
 
 
 class TestSaveAnnotation:
     def test_save_new_annotation(self, client: TestClient):
-        token = _admin_token(client)
-        image_id, batch_name, fname, w, h = _setup_image(client, token)
+        token, user_id = _admin_token(client)
+        image_id, batch_name, fname, w, h = _setup_image(client, token, user_id)
 
         body = {
             "expectedRev": 0,
@@ -127,8 +127,8 @@ class TestSaveAnnotation:
         assert len(saved["shapes"]) == 1
 
     def test_save_read_roundtrip(self, client: TestClient):
-        token = _admin_token(client)
-        image_id, _, _, _, _ = _setup_image(client, token)
+        token, user_id = _admin_token(client)
+        image_id, _, _, _, _ = _setup_image(client, token, user_id)
 
         body = {
             "expectedRev": 0,
@@ -153,8 +153,8 @@ class TestSaveAnnotation:
         assert data["shapes"][0]["label"] == "vessel"
 
     def test_version_conflict(self, client: TestClient):
-        token = _admin_token(client)
-        image_id, _, _, _, _ = _setup_image(client, token)
+        token, user_id = _admin_token(client)
+        image_id, _, _, _, _ = _setup_image(client, token, user_id)
 
         # Save once
         body = {
@@ -169,8 +169,8 @@ class TestSaveAnnotation:
         assert resp.status_code == 409
 
     def test_second_save_increments_rev(self, client: TestClient):
-        token = _admin_token(client)
-        image_id, _, _, _, _ = _setup_image(client, token)
+        token, user_id = _admin_token(client)
+        image_id, _, _, _, _ = _setup_image(client, token, user_id)
 
         # First save
         client.put(
@@ -197,7 +197,7 @@ class TestSaveAnnotation:
         assert resp.json()["rev"] == 2
 
     def test_save_annotation_404(self, client: TestClient):
-        token = _admin_token(client)
+        token, _ = _admin_token(client)
         body = {
             "expectedRev": 0,
             "shapes": [],
@@ -210,3 +210,18 @@ class TestSaveAnnotation:
         body = {"expectedRev": 0, "shapes": [], "labelStatus": {}}
         resp = client.put("/api/images/1/annotation", json=body)
         assert resp.status_code == 401
+
+    def test_other_user_annotation_404(self, client: TestClient):
+        token_a, user_id_a = _admin_token(client)
+        image_id, _, _, _, _ = _setup_image(client, token_a, user_id_a)
+
+        resp = client.post("/api/auth/register", json={"username": "ann_b", "password": "pass1234"})
+        token_b = resp.json()["access_token"]
+
+        # 读他人标注
+        r = client.get(f"/api/images/{image_id}/annotation", headers=_auth(token_b))
+        assert r.status_code == 404
+        # 存他人标注
+        body = {"expectedRev": 0, "shapes": [], "labelStatus": {}}
+        r2 = client.put(f"/api/images/{image_id}/annotation", json=body, headers=_auth(token_b))
+        assert r2.status_code == 404

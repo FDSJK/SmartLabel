@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.models.image import Image
 from app.models.user import User
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_owned_image
 
 router = APIRouter()
 
@@ -17,9 +17,7 @@ def acquire_lock(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    img = get_owned_image(db, current_user, image_id)
 
     now = datetime.utcnow()
     timeout = now - timedelta(minutes=LOCK_TIMEOUT_MINUTES)
@@ -61,9 +59,7 @@ def heartbeat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    img = get_owned_image(db, current_user, image_id)
 
     if img.locked_by != current_user.id:
         raise HTTPException(
@@ -82,9 +78,7 @@ def release_lock(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    img = get_owned_image(db, current_user, image_id)
 
     # Idempotent — only clear if this user holds the lock
     if img.locked_by == current_user.id:

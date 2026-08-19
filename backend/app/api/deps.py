@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import decode_access_token
 from app.models.user import User
+from app.models.batch import Batch
+from app.models.image import Image
 
 oauth2_scheme = HTTPBearer()
 
@@ -40,3 +42,22 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
             detail="Admin access required",
         )
     return current_user
+
+
+def get_owned_batch(db, user, batch_id) -> Batch:
+    batch = db.query(Batch).filter(Batch.id == batch_id, Batch.created_by == user.id).first()
+    if not batch:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+    return batch
+
+
+def get_owned_image(db, user, image_id) -> Image:
+    img = (
+        db.query(Image)
+        .join(Batch, Image.batch_id == Batch.id)
+        .filter(Image.id == image_id, Batch.created_by == user.id)
+        .first()
+    )
+    if not img:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return img

@@ -3,15 +3,13 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.db import get_db
-from app.models.batch import Batch
-from app.models.image import Image
 from app.models.user import User
 from app.schemas.annotation import (
     AnnotationSaveRequest,
     AnnotationReadResponse,
     AnnotationResponse,
 )
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_owned_image
 from app.services.annotation_store import read_annotation, write_annotation
 from app.services.work_dir import get_work_dir
 
@@ -22,17 +20,12 @@ router = APIRouter()
 def get_annotation(
     image_id: int,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    img = get_owned_image(db, current_user, image_id)
+    batch = img.batch
 
-    batch = db.query(Batch).filter(Batch.id == img.batch_id).first()
-    if not batch:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
-
-    work_dir = get_work_dir(db, _user)
+    work_dir = get_work_dir(db, current_user)
     data = read_annotation(work_dir, batch.name, img.file_name)
 
     if data is None:
@@ -65,9 +58,7 @@ def save_annotation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    img = get_owned_image(db, current_user, image_id)
 
     # Optimistic locking
     if body.expectedRev != img.annotation_rev:
@@ -76,9 +67,7 @@ def save_annotation(
             detail=f"Version conflict: expected rev {body.expectedRev}, server rev {img.annotation_rev}",
         )
 
-    batch = db.query(Batch).filter(Batch.id == img.batch_id).first()
-    if not batch:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+    batch = img.batch
 
     work_dir = get_work_dir(db, current_user)
 

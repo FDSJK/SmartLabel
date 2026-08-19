@@ -20,7 +20,7 @@ def scan_batches(work_dir: str, db: Session, created_by: int | None = None) -> d
         if not os.path.isdir(images_dir):
             continue
 
-        batch = db.query(Batch).filter(Batch.name == batch_name).first()
+        batch = db.query(Batch).filter(Batch.name == batch_name, Batch.created_by == created_by).first()
         if not batch:
             batch = Batch(name=batch_name, source="scan", created_by=created_by)
             db.add(batch)

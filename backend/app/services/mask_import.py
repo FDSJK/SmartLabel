@@ -234,10 +234,13 @@ def import_batch_masks(work_dir: str, batch: Batch, db: Session, username: str =
     return result
 
 
-def import_all_batches(work_dir: str, db: Session, username: str = "system") -> dict:
+def import_all_batches(work_dir: str, db: Session, username: str = "system", created_by: int | None = None) -> dict:
     """对所有批次执行 mask 导入，聚合结果。"""
     result = {"imported": 0, "skipped": 0, "errors": [], "created_labels": []}
-    for batch in db.query(Batch).all():
+    q = db.query(Batch)
+    if created_by is not None:
+        q = q.filter(Batch.created_by == created_by)
+    for batch in q.all():
         r = import_batch_masks(work_dir, batch, db, username=username)
         result["imported"] += r["imported"]
         result["skipped"] += r["skipped"]

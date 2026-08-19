@@ -4,7 +4,7 @@ from PIL import Image as PILImage
 import numpy as np
 
 
-def _admin_token(client: TestClient) -> str:
+def _admin_token(client: TestClient) -> tuple[str, int]:
     from app.core.security import hash_password, create_access_token
     from app.models.user import User
     from app.main import app
@@ -15,7 +15,7 @@ def _admin_token(client: TestClient) -> str:
     db.add(user)
     db.commit()
     db.refresh(user)
-    return create_access_token({"sub": str(user.id)})
+    return create_access_token({"sub": str(user.id)}), user.id
 
 
 def _auth(token: str) -> dict:
@@ -24,7 +24,7 @@ def _auth(token: str) -> dict:
 
 class TestServeImageFile:
     def test_serve_image_200(self, client: TestClient, tmp_work_dir: str):
-        token = _admin_token(client)
+        token, user_id = _admin_token(client)
 
         # Create a batch and image record
         batches_dir = os.path.join(tmp_work_dir, "batches", "test-batch", "images")
@@ -39,7 +39,7 @@ class TestServeImageFile:
         from app.models.batch import Batch
         from app.models.image import Image
 
-        batch = Batch(name="test-batch", source="upload")
+        batch = Batch(name="test-batch", source="upload", created_by=user_id)
         db.add(batch)
         db.commit()
         db.refresh(batch)
@@ -62,7 +62,7 @@ class TestServeImageFile:
         assert len(resp.content) > 0
 
     def test_serve_image_404(self, client: TestClient):
-        token = _admin_token(client)
+        token, _ = _admin_token(client)
         resp = client.get("/api/images/99999/file", headers=_auth(token))
         assert resp.status_code == 404
 
@@ -73,7 +73,7 @@ class TestServeImageFile:
 
 class TestExportMask:
     def _setup(self, client, tmp_work_dir):
-        token = _admin_token(client)
+        token, user_id = _admin_token(client)
         batches_dir = os.path.join(tmp_work_dir, "batches", "test-batch", "images")
         os.makedirs(batches_dir)
         PILImage.fromarray(np.zeros((50, 50, 3), dtype=np.uint8) + 128).save(
@@ -83,7 +83,7 @@ class TestExportMask:
         db = next(app.dependency_overrides[get_db]())
         from app.models.batch import Batch
         from app.models.image import Image
-        batch = Batch(name="test-batch", source="upload")
+        batch = Batch(name="test-batch", source="upload", created_by=user_id)
         db.add(batch); db.commit(); db.refresh(batch)
         image = Image(batch_id=batch.id, file_name="sample.png",
                       src_rel_path="batches/test-batch/images/sample.png",
@@ -105,7 +105,7 @@ class TestExportMask:
             tmp_work_dir, "batches", "test-batch", "masks", "cat", "sample.png"))
 
     def test_export_mask_404(self, client):
-        token = _admin_token(client)
+        token, _ = _admin_token(client)
         resp = client.post("/api/images/99999/export-mask",
                            json={"shapes": [], "labelStatus": {}}, headers=_auth(token))
         assert resp.status_code == 404

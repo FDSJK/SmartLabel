@@ -9,7 +9,7 @@ from app.models.image import Image
 from app.models.user import User
 from app.schemas.batch import BatchCreate, BatchResponse
 from app.schemas.image import ImageResponse
-from app.api.deps import require_admin, get_current_user
+from app.api.deps import get_current_user, get_owned_batch, get_owned_image
 from app.services.scanner import scan_batches
 from app.services.mask_import import import_batch_masks, import_all_batches
 from app.services.work_dir import get_work_dir
@@ -55,9 +55,14 @@ def _image_to_response(img: Image, db: Session) -> ImageResponse:
 @router.get("/batches", response_model=list[BatchResponse])
 def list_batches(
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    batches = db.query(Batch).order_by(Batch.created_at.desc()).all()
+    batches = (
+        db.query(Batch)
+        .filter(Batch.created_by == current_user.id)
+        .order_by(Batch.created_at.desc())
+        .all()
+    )
     return [_batch_to_response(b, db) for b in batches]
 
 
@@ -65,12 +70,12 @@ def list_batches(
 def create_batch(
     body: BatchCreate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    existing = db.query(Batch).filter(Batch.name == body.name).first()
+    existing = db.query(Batch).filter(Batch.name == body.name, Batch.created_by == current_user.id).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Batch name already exists")
-    batch = Batch(name=body.name, source="upload", created_by=admin.id)
+    batch = Batch(name=body.name, source="upload", created_by=current_user.id)
     db.add(batch)
     db.commit()
     db.refresh(batch)
@@ -81,11 +86,9 @@ def create_batch(
 def delete_batch(
     batch_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    batch = db.query(Batch).filter(Batch.id == batch_id).first()
-    if not batch:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+    batch = get_owned_batch(db, current_user, batch_id)
 
     # 检查是否有已标注的图片
     annotated = db.query(Image).filter(
@@ -99,7 +102,7 @@ def delete_batch(
         )
 
     # 删除文件系统中的批次目录
-    work_dir = get_work_dir(db, admin)
+    work_dir = get_work_dir(db, current_user)
     batch_dir = os.path.join(work_dir, "batches", batch.name)
     if os.path.isdir(batch_dir):
         shutil.rmtree(batch_dir)
@@ -111,11 +114,11 @@ def delete_batch(
 @router.post("/batches/scan")
 def trigger_scan(
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    work_dir = get_work_dir(db, admin)
-    result = scan_batches(work_dir, db, created_by=admin.id)
-    imp = import_all_batches(work_dir, db, username=admin.username)
+    work_dir = get_work_dir(db, current_user)
+    result = scan_batches(work_dir, db, created_by=current_user.id)
+    imp = import_all_batches(work_dir, db, username=current_user.username, created_by=current_user.id)
     result["imported"] = imp["imported"]
     result["created_labels"] = list(dict.fromkeys(imp["created_labels"]))
     result["errors"].extend(imp["errors"])
@@ -127,13 +130,11 @@ async def upload_images(
     batch_id: int,
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    batch = db.query(Batch).filter(Batch.id == batch_id).first()
-    if not batch:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+    batch = get_owned_batch(db, current_user, batch_id)
 
-    work_dir = get_work_dir(db, admin)
+    work_dir = get_work_dir(db, current_user)
     batch_dir = os.path.join(work_dir, "batches", batch.name)
     images_dir = os.path.join(batch_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
@@ -188,8 +189,9 @@ async def upload_images(
 def list_images(
     batch_id: int,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    get_owned_batch(db, current_user, batch_id)
     images = db.query(Image).filter(Image.batch_id == batch_id).order_by(Image.file_name).all()
     return [_image_to_response(img, db) for img in images]
 
@@ -198,14 +200,12 @@ def list_images(
 def import_masks(
     batch_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    batch = db.query(Batch).filter(Batch.id == batch_id).first()
-    if not batch:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+    batch = get_owned_batch(db, current_user, batch_id)
 
-    work_dir = get_work_dir(db, admin)
-    r = import_batch_masks(work_dir, batch, db, username=admin.username)
+    work_dir = get_work_dir(db, current_user)
+    r = import_batch_masks(work_dir, batch, db, username=current_user.username)
     r["created_labels"] = list(dict.fromkeys(r["created_labels"]))
     return r
 
@@ -214,9 +214,7 @@ def import_masks(
 def get_image(
     image_id: int,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    img = get_owned_image(db, current_user, image_id)
     return _image_to_response(img, db)

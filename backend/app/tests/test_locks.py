@@ -20,7 +20,7 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _create_image(client: TestClient, token: str) -> int:
+def _create_image(client: TestClient, token: str, user_id: int) -> int:
     import os
     from PIL import Image as PILImage
     import numpy as np
@@ -39,7 +39,7 @@ def _create_image(client: TestClient, token: str) -> int:
     db = next(app.dependency_overrides[get_db]())
     batch = db.query(Batch).filter(Batch.name == "_locktest").first()
     if not batch:
-        batch = Batch(name="_locktest", source="upload")
+        batch = Batch(name="_locktest", source="upload", created_by=user_id)
         db.add(batch)
         db.commit()
         db.refresh(batch)
@@ -60,8 +60,8 @@ def _create_image(client: TestClient, token: str) -> int:
 
 class TestAcquireLock:
     def test_acquire_free_lock(self, client: TestClient):
-        token, _ = _create_user_and_token(client, "locker1")
-        image_id = _create_image(client, token)
+        token, user_id = _create_user_and_token(client, "locker1")
+        image_id = _create_image(client, token, user_id)
 
         resp = client.post(f"/api/images/{image_id}/lock", headers=_auth(token))
         assert resp.status_code == 200
@@ -70,8 +70,8 @@ class TestAcquireLock:
         assert data["locked_by_username"] == "locker1"
 
     def test_acquire_same_user_refreshes(self, client: TestClient):
-        token, _ = _create_user_and_token(client, "locker2")
-        image_id = _create_image(client, token)
+        token, user_id = _create_user_and_token(client, "locker2")
+        image_id = _create_image(client, token, user_id)
 
         # First acquire
         client.post(f"/api/images/{image_id}/lock", headers=_auth(token))
@@ -80,26 +80,22 @@ class TestAcquireLock:
         assert resp.status_code == 200
         assert resp.json()["locked"] is True
 
-    def test_acquire_blocked_by_other(self, client: TestClient):
-        token1, _ = _create_user_and_token(client, "locker_a")
+    def test_acquire_locked_image_by_other_404(self, client: TestClient):
+        token1, user_id1 = _create_user_and_token(client, "locker_a")
         token2, _ = _create_user_and_token(client, "locker_b")
-        image_id = _create_image(client, token1)
+        image_id = _create_image(client, token1, user_id1)
 
         # User A locks
         client.post(f"/api/images/{image_id}/lock", headers=_auth(token1))
-        # User B tries to lock
+        # User B (non-owner) cannot see the image at all
         resp = client.post(f"/api/images/{image_id}/lock", headers=_auth(token2))
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["locked"] is False
-        assert data["locked_by_username"] == "locker_a"
+        assert resp.status_code == 404
 
     def test_acquire_expired_lock(self, client: TestClient):
         token1, uid1 = _create_user_and_token(client, "locker_c")
-        token2, _ = _create_user_and_token(client, "locker_d")
-        image_id = _create_image(client, token1)
+        image_id = _create_image(client, token1, uid1)
 
-        # User C locks, then we manually expire it
+        # Owner locks, then we manually expire it
         client.post(f"/api/images/{image_id}/lock", headers=_auth(token1))
         from app.main import app
         from app.core.db import get_db
@@ -109,11 +105,11 @@ class TestAcquireLock:
         img.locked_at = datetime.utcnow() - timedelta(minutes=31)
         db.commit()
 
-        # User D should now be able to lock
-        resp = client.post(f"/api/images/{image_id}/lock", headers=_auth(token2))
+        # Owner should be able to re-acquire the expired lock
+        resp = client.post(f"/api/images/{image_id}/lock", headers=_auth(token1))
         assert resp.status_code == 200
         assert resp.json()["locked"] is True
-        assert resp.json()["locked_by_username"] == "locker_d"
+        assert resp.json()["locked_by_username"] == "locker_c"
 
     def test_acquire_lock_404(self, client: TestClient):
         token, _ = _create_user_and_token(client, "locker_e")
@@ -124,11 +120,19 @@ class TestAcquireLock:
         resp = client.post("/api/images/1/lock")
         assert resp.status_code == 401
 
+    def test_acquire_lock_on_others_image_404(self, client: TestClient):
+        token1, user_id1 = _create_user_and_token(client, "locker_owner")
+        token2, _ = _create_user_and_token(client, "locker_intruder")
+        image_id = _create_image(client, token1, user_id1)
+
+        resp = client.post(f"/api/images/{image_id}/lock", headers=_auth(token2))
+        assert resp.status_code == 404
+
 
 class TestHeartbeat:
     def test_heartbeat_when_holding_lock(self, client: TestClient):
-        token, _ = _create_user_and_token(client, "hb1")
-        image_id = _create_image(client, token)
+        token, user_id = _create_user_and_token(client, "hb1")
+        image_id = _create_image(client, token, user_id)
 
         client.post(f"/api/images/{image_id}/lock", headers=_auth(token))
         resp = client.post(f"/api/images/{image_id}/heartbeat", headers=_auth(token))
@@ -136,8 +140,8 @@ class TestHeartbeat:
         assert resp.json()["ok"] is True
 
     def test_heartbeat_without_lock(self, client: TestClient):
-        token, _ = _create_user_and_token(client, "hb2")
-        image_id = _create_image(client, token)
+        token, user_id = _create_user_and_token(client, "hb2")
+        image_id = _create_image(client, token, user_id)
 
         resp = client.post(f"/api/images/{image_id}/heartbeat", headers=_auth(token))
         assert resp.status_code == 409
@@ -150,8 +154,8 @@ class TestHeartbeat:
 
 class TestReleaseLock:
     def test_release_own_lock(self, client: TestClient):
-        token, _ = _create_user_and_token(client, "rel1")
-        image_id = _create_image(client, token)
+        token, user_id = _create_user_and_token(client, "rel1")
+        image_id = _create_image(client, token, user_id)
 
         client.post(f"/api/images/{image_id}/lock", headers=_auth(token))
         resp = client.delete(f"/api/images/{image_id}/lock", headers=_auth(token))
@@ -166,8 +170,8 @@ class TestReleaseLock:
         assert img.locked_by is None
 
     def test_release_idempotent(self, client: TestClient):
-        token, _ = _create_user_and_token(client, "rel2")
-        image_id = _create_image(client, token)
+        token, user_id = _create_user_and_token(client, "rel2")
+        image_id = _create_image(client, token, user_id)
 
         resp = client.delete(f"/api/images/{image_id}/lock", headers=_auth(token))
         assert resp.status_code == 204
