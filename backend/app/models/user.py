@@ -15,3 +15,4 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
+    work_dir: Mapped[str | None] = mapped_column(String(1024), nullable=True)

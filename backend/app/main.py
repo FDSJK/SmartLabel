@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core import settings, init_db, Base
 from app.core.db import get_engine
+from app.core.migrations import run_migrations
 from app.api import api_router
 
 
@@ -27,6 +28,8 @@ async def lifespan(app: FastAPI):
             )
             db.add(admin)
             db.commit()
+
+    run_migrations(get_engine())
 
     yield
 

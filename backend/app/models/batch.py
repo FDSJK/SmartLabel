@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, Integer, DateTime, ForeignKey
+from sqlalchemy import String, Integer, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db import Base
 
@@ -8,7 +8,7 @@ class Batch(Base):
     __tablename__ = "batches"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(256), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="upload")
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     note: Mapped[str] = mapped_column(String(1024), nullable=False, default="")
@@ -16,6 +16,8 @@ class Batch(Base):
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     images: Mapped[list["Image"]] = relationship("Image", back_populates="batch", cascade="all, delete-orphan")
+
+    __table_args__ = (UniqueConstraint("created_by", "name", name="uq_batches_created_by_name"),)
 
 
 from app.models.image import Image  # noqa: E402
