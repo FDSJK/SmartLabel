@@ -19,11 +19,11 @@ export default function Layout() {
         <nav className={styles.nav}>
           <Link to="/">标注</Link>
           <Link to="/stats">统计</Link>
+          <Link to="/settings">设置</Link>
           {user?.role === 'admin' && (
             <>
               <Link to="/admin/users">用户管理</Link>
               <Link to="/admin/labels">标签管理</Link>
-              <Link to="/admin/settings">系统设置</Link>
             </>
           )}
         </nav>

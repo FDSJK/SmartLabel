@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBatchStore } from '../../stores/batchStore';
-import { useAuthStore } from '../../stores/authStore';
 import { ApiError } from '../../api/client';
 import styles from './BatchSelector.module.css';
 
 export default function BatchSelector() {
   const { batches, currentBatchId, loadBatches, selectBatch, deselectBatch, doScan, doCreateAndUpload, doUploadToBatch, doDeleteBatch, loading } = useBatchStore();
-  const { user } = useAuthStore();
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadTarget = useRef<'new' | 'existing'>('new');
@@ -80,7 +78,7 @@ export default function BatchSelector() {
         <button className={styles.btn} onClick={handleUploadClick} disabled={uploading}>
           {uploading ? '上传中...' : currentBatchId ? '补充上传' : '新建上传'}
         </button>
-        {user?.role === 'admin' && currentBatchId && (
+        {currentBatchId && (
           <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleDelete}>删除批次</button>
         )}
         <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/tiff" multiple

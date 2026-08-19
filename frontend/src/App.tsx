@@ -4,7 +4,7 @@ import AnnotationPage from './pages/AnnotationPage';
 import StatsPage from './pages/StatsPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminLabelsPage from './pages/AdminLabelsPage';
-import AdminSettingsPage from './pages/AdminSettingsPage';
+import MySettingsPage from './pages/MySettingsPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import Layout from './components/common/Layout';
 
@@ -18,7 +18,7 @@ export default function App() {
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/labels" element={<AdminLabelsPage />} />
-          <Route path="/admin/settings" element={<AdminSettingsPage />} />
+          <Route path="/settings" element={<MySettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

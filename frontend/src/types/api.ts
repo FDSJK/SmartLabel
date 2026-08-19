@@ -3,6 +3,7 @@ export interface User {
   username: string;
   role: 'admin' | 'annotator';
   is_active: boolean;
+  work_dir: string | null;
   created_at: string;
 }
 

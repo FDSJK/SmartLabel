@@ -6,7 +6,7 @@ import styles from './AdminUsersPage.module.css';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'annotator' });
+  const [newUser, setNewUser] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
 
   const load = async () => {
@@ -20,7 +20,7 @@ export default function AdminUsersPage() {
     setError('');
     try {
       await createUser(newUser);
-      setNewUser({ username: '', password: '', role: 'annotator' });
+      setNewUser({ username: '', password: '' });
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : '创建失败');
@@ -61,11 +61,6 @@ export default function AdminUsersPage() {
           onChange={e => setNewUser({...newUser, username: e.target.value})} required />
         <input className={styles.input} type="password" placeholder="密码" value={newUser.password}
           onChange={e => setNewUser({...newUser, password: e.target.value})} required minLength={4} />
-        <select className={styles.input} value={newUser.role}
-          onChange={e => setNewUser({...newUser, role: e.target.value})}>
-          <option value="annotator">标注员</option>
-          <option value="admin">管理员</option>
-        </select>
         <button className={styles.btn} type="submit">创建账号</button>
       </form>
       <table className={styles.table}>
