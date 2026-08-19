@@ -52,6 +52,29 @@ def test_scan_skips_existing(client: TestClient, tmp_work_dir: str):
     assert r2.json()["skipped"] == 1
 
 
+def test_scan_cleans_missing_batches(client: TestClient, tmp_work_dir: str):
+    token = _admin_token(client)
+
+    batches_dir = os.path.join(tmp_work_dir, "batches", "gone-batch", "images")
+    os.makedirs(batches_dir)
+    img = PILImage.fromarray(np.zeros((10, 10, 3), dtype=np.uint8))
+    img.save(os.path.join(batches_dir, "img.png"))
+
+    r1 = client.post("/api/batches/scan", headers=_auth(token))
+    assert r1.json()["added"] == 1
+
+    # 外部强制删除该批次文件夹
+    import shutil
+    shutil.rmtree(os.path.join(tmp_work_dir, "batches", "gone-batch"))
+
+    r2 = client.post("/api/batches/scan", headers=_auth(token))
+    assert r2.json()["removed"] == 1
+
+    resp = client.get("/api/batches", headers=_auth(token))
+    names = [b["name"] for b in resp.json()]
+    assert "gone-batch" not in names
+
+
 def test_scan_creates_batch_automatically(client: TestClient, tmp_work_dir: str):
     token = _admin_token(client)
 

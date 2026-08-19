@@ -16,7 +16,7 @@ export default function BatchSelector() {
 
   const handleScan = async () => {
     const result = await doScan();
-    alert(`扫描完成：新增 ${result.added}，跳过 ${result.skipped}`);
+    alert(`扫描完成：新增 ${result.added}，跳过 ${result.skipped}，清理 ${result.removed}`);
   };
 
   const handleUploadClick = () => {
