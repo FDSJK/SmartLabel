@@ -4,26 +4,17 @@ import shutil
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.core.db import get_db
-import app.core.config as _config
 from app.models.batch import Batch
 from app.models.image import Image
-from app.models.setting import Setting
 from app.models.user import User
 from app.schemas.batch import BatchCreate, BatchResponse
 from app.schemas.image import ImageResponse
 from app.api.deps import require_admin, get_current_user
 from app.services.scanner import scan_batches
 from app.services.mask_import import import_batch_masks, import_all_batches
+from app.services.work_dir import get_work_dir
 
 router = APIRouter()
-
-
-def _get_work_dir(db: Session) -> str:
-    """Read WORK_DIR from the database settings table, fall back to config default."""
-    row = db.query(Setting).filter(Setting.key == "WORK_DIR").first()
-    if row and row.value.strip():
-        return row.value.strip()
-    return _config.settings.WORK_DIR
 
 
 def _batch_to_response(b: Batch, db: Session) -> BatchResponse:
@@ -108,7 +99,7 @@ def delete_batch(
         )
 
     # 删除文件系统中的批次目录
-    work_dir = _get_work_dir(db)
+    work_dir = get_work_dir(db, admin)
     batch_dir = os.path.join(work_dir, "batches", batch.name)
     if os.path.isdir(batch_dir):
         shutil.rmtree(batch_dir)
@@ -122,7 +113,7 @@ def trigger_scan(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    work_dir = _get_work_dir(db)
+    work_dir = get_work_dir(db, admin)
     result = scan_batches(work_dir, db, created_by=admin.id)
     imp = import_all_batches(work_dir, db, username=admin.username)
     result["imported"] = imp["imported"]
@@ -142,7 +133,7 @@ async def upload_images(
     if not batch:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
 
-    work_dir = _get_work_dir(db)
+    work_dir = get_work_dir(db, admin)
     batch_dir = os.path.join(work_dir, "batches", batch.name)
     images_dir = os.path.join(batch_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
@@ -213,7 +204,7 @@ def import_masks(
     if not batch:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
 
-    work_dir = _get_work_dir(db)
+    work_dir = get_work_dir(db, admin)
     r = import_batch_masks(work_dir, batch, db, username=admin.username)
     r["created_labels"] = list(dict.fromkeys(r["created_labels"]))
     return r

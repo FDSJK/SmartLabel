@@ -3,14 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.core.db import get_db
-import app.core.config as _config
 from app.models.image import Image
-from app.models.setting import Setting
 from app.models.user import User
 from app.api.deps import get_current_user
 from app.models.batch import Batch
 from app.schemas.annotation import MaskExportRequest, MaskExportResponse
 from app.services.mask_export import export_image_masks
+from app.services.work_dir import get_work_dir
 
 router = APIRouter()
 
@@ -23,13 +22,6 @@ MIME_MAP = {
 }
 
 
-def _get_work_dir(db: Session) -> str:
-    row = db.query(Setting).filter(Setting.key == "WORK_DIR").first()
-    if row and row.value.strip():
-        return row.value.strip()
-    return _config.settings.WORK_DIR
-
-
 @router.get("/images/{image_id}/file")
 def serve_image_file(
     image_id: int,
@@ -40,7 +32,7 @@ def serve_image_file(
     if not img:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
-    work_dir = _get_work_dir(db)
+    work_dir = get_work_dir(db, _user)
     rel_path = img.work_rel_path or img.src_rel_path
     abs_path = os.path.join(work_dir, rel_path)
 
@@ -68,7 +60,7 @@ def export_mask(
     if not batch:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
 
-    work_dir = _get_work_dir(db)
+    work_dir = get_work_dir(db, current_user)
     shapes_dicts = [
         {"id": s.id, "label": s.label, "shapeType": s.shapeType,
          "points": s.points, "holes": s.holes}

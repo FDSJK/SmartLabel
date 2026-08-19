@@ -3,10 +3,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.db import get_db
-import app.core.config as _config
 from app.models.batch import Batch
 from app.models.image import Image
-from app.models.setting import Setting
 from app.models.user import User
 from app.schemas.annotation import (
     AnnotationSaveRequest,
@@ -15,15 +13,9 @@ from app.schemas.annotation import (
 )
 from app.api.deps import get_current_user
 from app.services.annotation_store import read_annotation, write_annotation
+from app.services.work_dir import get_work_dir
 
 router = APIRouter()
-
-
-def _get_work_dir(db: Session) -> str:
-    row = db.query(Setting).filter(Setting.key == "WORK_DIR").first()
-    if row and row.value.strip():
-        return row.value.strip()
-    return _config.settings.WORK_DIR
 
 
 @router.get("/images/{image_id}/annotation", response_model=AnnotationReadResponse)
@@ -40,7 +32,7 @@ def get_annotation(
     if not batch:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
 
-    work_dir = _get_work_dir(db)
+    work_dir = get_work_dir(db, _user)
     data = read_annotation(work_dir, batch.name, img.file_name)
 
     if data is None:
@@ -88,7 +80,7 @@ def save_annotation(
     if not batch:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
 
-    work_dir = _get_work_dir(db)
+    work_dir = get_work_dir(db, current_user)
 
     # Convert shapes to dicts
     shapes_dicts = [
