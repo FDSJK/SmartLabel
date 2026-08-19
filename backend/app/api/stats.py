@@ -15,8 +15,8 @@ router = APIRouter()
 def get_stats(
     batch_id: int | None = None,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    work_dir = get_work_dir(db, _user)
-    result = compute_stats(work_dir, db, batch_id)
+    work_dir = get_work_dir(db, current_user)
+    result = compute_stats(work_dir, db, batch_id, created_by=current_user.id)
     return StatsResponse(totalImages=result["total_images"], labels=result["labels"])

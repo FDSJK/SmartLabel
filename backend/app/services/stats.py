@@ -4,15 +4,23 @@ from app.models.label import Label
 from app.services.annotation_store import read_annotation
 
 
-def compute_stats(work_dir: str, db, batch_id: int | None = None) -> dict:
+def compute_stats(work_dir: str, db, batch_id: int | None = None, created_by: int | None = None) -> dict:
     """按启用标签统计 present/absent/pending 图像数。batch_id=None 为全局。
 
     返回 {"total_images": int, "labels": [{"name","present","absent","pending"}, ...]}
     """
     labels = db.query(Label).filter(Label.enabled.is_(True)).order_by(Label.sort_order, Label.id).all()
-    images = db.query(Image).all() if batch_id is None else db.query(Image).filter(Image.batch_id == batch_id).all()
+    q = db.query(Image).join(Batch, Image.batch_id == Batch.id)
+    if created_by is not None:
+        q = q.filter(Batch.created_by == created_by)
+    if batch_id is not None:
+        q = q.filter(Image.batch_id == batch_id)
+    images = q.all()
 
-    batch_names = {b.id: b.name for b in db.query(Batch).all()}
+    bq = db.query(Batch)
+    if created_by is not None:
+        bq = bq.filter(Batch.created_by == created_by)
+    batch_names = {b.id: b.name for b in bq.all()}
     counts = {label.name: {"present": 0, "absent": 0, "pending": 0} for label in labels}
 
     for img in images:

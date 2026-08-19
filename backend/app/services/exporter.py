@@ -80,20 +80,26 @@ def _mask_to_rle(mask):
 
 # ---------- 范围与读取 ----------
 
-def _resolve_scope(db, scope, image_id, batch_id):
+def _resolve_scope(db, scope, image_id, batch_id, created_by=None):
     labels = db.query(Label).filter(Label.enabled.is_(True)).order_by(Label.sort_order, Label.id).all()
+    base = db.query(Image).join(Batch, Image.batch_id == Batch.id)
+    if created_by is not None:
+        base = base.filter(Batch.created_by == created_by)
     if scope == "image":
-        img = db.query(Image).filter(Image.id == image_id).first()
+        img = base.filter(Image.id == image_id).first()
         images = [img] if img else []
     elif scope == "batch":
-        images = db.query(Image).filter(Image.batch_id == batch_id).all()
+        images = base.filter(Image.batch_id == batch_id).all()
     else:
-        images = db.query(Image).all()
+        images = base.all()
     return images, labels
 
 
-def _load_items(work_dir, db, images):
-    batch_names = {b.id: b.name for b in db.query(Batch).all()}
+def _load_items(work_dir, db, images, created_by=None):
+    bq = db.query(Batch)
+    if created_by is not None:
+        bq = bq.filter(Batch.created_by == created_by)
+    batch_names = {b.id: b.name for b in bq.all()}
     items = []
     errors = []
     for img in images:
@@ -110,9 +116,9 @@ def _load_items(work_dir, db, images):
     return items, errors
 
 
-def collect_scope(work_dir, db, scope, image_id, batch_id):
-    images, labels = _resolve_scope(db, scope, image_id, batch_id)
-    items, errors = _load_items(work_dir, db, images)
+def collect_scope(work_dir, db, scope, image_id, batch_id, created_by=None):
+    images, labels = _resolve_scope(db, scope, image_id, batch_id, created_by)
+    items, errors = _load_items(work_dir, db, images, created_by)
     return {"images": images, "labels": labels, "items": items, "errors": errors}
 
 
@@ -205,24 +211,24 @@ def _build_labelme(img, data):
 
 # ---------- 生成 ----------
 
-def _scope_name(db, scope, image_id, batch_id, images):
+def _scope_name(db, scope, image_id, batch_id, images, created_by=None):
     if scope == "image":
         stem = os.path.splitext(images[0].file_name)[0] if images else "unknown"
         return f"image-{stem}"
     if scope == "batch":
-        batch = db.query(Batch).filter(Batch.id == batch_id).first()
+        batch = db.query(Batch).filter(Batch.id == batch_id, Batch.created_by == created_by).first()
         return f"batch-{batch.name if batch else 'unknown'}"
     return "all"
 
 
-def generate_export(work_dir, db, *, scope, image_id, batch_id, collected, formats, username="system"):
+def generate_export(work_dir, db, *, scope, image_id, batch_id, collected, formats, username="system", created_by=None):
     images = collected["images"]
     labels = collected["labels"]
     items = collected["items"]
     errors = list(collected["errors"])
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    export_dir = os.path.join(work_dir, "export", f"{stamp}-{_scope_name(db, scope, image_id, batch_id, images)}")
+    export_dir = os.path.join(work_dir, "export", f"{stamp}-{_scope_name(db, scope, image_id, batch_id, images, created_by)}")
 
     annotation_count = 0
     mask_count = 0
@@ -265,7 +271,7 @@ def generate_export(work_dir, db, *, scope, image_id, batch_id, collected, forma
     }
 
 
-def run_export(work_dir, db, *, scope, image_id, batch_id, formats, username="system"):
-    collected = collect_scope(work_dir, db, scope, image_id, batch_id)
+def run_export(work_dir, db, *, scope, image_id, batch_id, formats, username="system", created_by=None):
+    collected = collect_scope(work_dir, db, scope, image_id, batch_id, created_by)
     return generate_export(work_dir, db, scope=scope, image_id=image_id, batch_id=batch_id,
-                           collected=collected, formats=formats, username=username)
+                           collected=collected, formats=formats, username=username, created_by=created_by)

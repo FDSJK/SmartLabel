@@ -18,21 +18,22 @@ def _admin_token(client):
     db.add(user)
     db.commit()
     db.refresh(user)
+    user_id = user.id
     db.close()
-    return create_access_token({"sub": str(user.id)})
+    return create_access_token({"sub": str(user_id)}), user_id
 
 
 def _auth(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def _seed(tmp_work_dir):
+def _seed(tmp_work_dir, created_by=None):
     """批次 b1 + 2 标签 + 3 图 + 不同 labelStatus 的 sidecar。"""
     from app.models.batch import Batch
     from app.models.image import Image
     from app.models.label import Label
     db = _session()
-    db.add(Batch(name="b1", source="upload"))
+    db.add(Batch(name="b1", source="upload", created_by=created_by))
     db.add(Label(name="cat", color="#f00", sort_order=0))
     db.add(Label(name="dog", color="#0f0", sort_order=1))
     db.commit()
@@ -55,7 +56,7 @@ def _seed(tmp_work_dir):
     from app.models.batch import Batch as _Batch
     from app.models.image import Image as _Image
     db = _session()
-    b2 = _Batch(name="b2", source="upload")
+    b2 = _Batch(name="b2", source="upload", created_by=created_by)
     db.add(b2)
     db.commit()
     db.add(_Image(batch_id=b2.id, file_name="b0.png",
@@ -99,8 +100,8 @@ def test_compute_stats_batch(client, tmp_work_dir):
 
 
 def test_stats_endpoint(client, tmp_work_dir):
-    _seed(tmp_work_dir)
-    token = _admin_token(client)
+    token, admin_id = _admin_token(client)
+    _seed(tmp_work_dir, created_by=admin_id)
     res = client.get("/api/stats", headers=_auth(token))
     assert res.status_code == 200
     body = res.json()
@@ -140,3 +141,25 @@ def test_compute_stats_non_dict_label_status(client, tmp_work_dir):
     db.close()
     by_name = {l["name"]: l for l in result["labels"]}
     assert by_name["cat"] == {"name": "cat", "present": 0, "absent": 0, "pending": 1}
+
+
+def test_stats_endpoint_isolated_per_user(client, tmp_work_dir):
+    # 用户 A 有数据，用户 B 无 → B 的 totalImages 为 0
+    from app.models.user import User
+    from app.core.security import hash_password, create_access_token
+    db = _session()
+    a = User(username="stat_a", password_hash=hash_password("x"), role="annotator")
+    db.add(a); db.commit(); db.refresh(a)
+    a_id = a.id
+    db.close()
+    _seed(tmp_work_dir, created_by=a_id)
+    token_a = create_access_token({"sub": str(a_id)})
+    # B
+    db = _session()
+    b = User(username="stat_b", password_hash=hash_password("x"), role="annotator")
+    db.add(b); db.commit(); db.refresh(b)
+    b_id = b.id
+    db.close()
+    token_b = create_access_token({"sub": str(b_id)})
+    assert client.get("/api/stats", headers=_auth(token_a)).json()["totalImages"] == 4
+    assert client.get("/api/stats", headers=_auth(token_b)).json()["totalImages"] == 0

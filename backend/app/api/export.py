@@ -18,7 +18,7 @@ def export(
     current_user: User = Depends(get_current_user),
 ):
     work_dir = get_work_dir(db, current_user)
-    collected = collect_scope(work_dir, db, body.scope, body.imageId, body.batchId)
+    collected = collect_scope(work_dir, db, body.scope, body.imageId, body.batchId, created_by=current_user.id)
     if not collected["images"]:
         if body.scope == "image":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -35,6 +35,7 @@ def export(
         work_dir, db,
         scope=body.scope, image_id=body.imageId, batch_id=body.batchId,
         collected=collected, formats=body.formats, username=current_user.username,
+        created_by=current_user.id,
     )
     return ExportResponse(
         exportDir=result["export_dir"],
