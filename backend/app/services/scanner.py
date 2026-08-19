@@ -7,12 +7,12 @@ from app.services.image_processor import get_image_info, convert_to_rgb, SUPPORT
 
 
 def scan_batches(work_dir: str, db: Session, created_by: int | None = None) -> dict:
-    """Scan batches/*/images/ for new images. Returns {added, skipped, errors}."""
+    """Scan batches/*/images/ for new images. Returns {added, skipped, removed, errors}."""
     batches_dir = os.path.join(work_dir, "batches")
     if not os.path.isdir(batches_dir):
-        return {"added": 0, "skipped": 0, "errors": []}
+        return {"added": 0, "skipped": 0, "removed": 0, "errors": []}
 
-    result = {"added": 0, "skipped": 0, "errors": []}
+    result = {"added": 0, "skipped": 0, "removed": 0, "errors": []}
 
     for batch_name in sorted(os.listdir(batches_dir)):
         batch_path = os.path.join(batches_dir, batch_name)
@@ -84,6 +84,16 @@ def scan_batches(work_dir: str, db: Session, created_by: int | None = None) -> d
 
             db.add(image)
             result["added"] += 1
+
+    # 清理：工作目录里已不存在的批次（文件夹被外部删除）→ 移除其 DB 记录
+    q = db.query(Batch)
+    if created_by is not None:
+        q = q.filter(Batch.created_by == created_by)
+    for batch in q.all():
+        if not os.path.isdir(os.path.join(batches_dir, batch.name)):
+            db.query(Image).filter(Image.batch_id == batch.id).delete()
+            db.delete(batch)
+            result["removed"] += 1
 
     db.commit()
     return result

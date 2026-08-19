@@ -10,7 +10,7 @@ interface BatchState {
   loading: boolean;
   loadBatches: () => Promise<void>;
   selectBatch: (batchId: number) => Promise<void>;
-  doScan: () => Promise<{ added: number; skipped: number }>;
+  doScan: () => Promise<{ added: number; skipped: number; removed: number }>;
   doCreateAndUpload: (name: string, files: File[]) => Promise<void>;
   doUploadToBatch: (batchId: number, files: File[]) => Promise<void>;
   doDeleteBatch: (batchId: number) => Promise<void>;

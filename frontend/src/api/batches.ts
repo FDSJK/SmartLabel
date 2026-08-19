@@ -9,7 +9,7 @@ export async function createBatch(name: string): Promise<Batch> {
   return apiClient.post<Batch>('/batches', { name });
 }
 
-export async function scanBatches(): Promise<{ added: number; skipped: number; errors: unknown[] }> {
+export async function scanBatches(): Promise<{ added: number; skipped: number; removed: number; errors: unknown[] }> {
   return apiClient.post('/batches/scan');
 }
 
