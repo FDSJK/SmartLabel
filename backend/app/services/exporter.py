@@ -216,7 +216,10 @@ def _scope_name(db, scope, image_id, batch_id, images, created_by=None):
         stem = os.path.splitext(images[0].file_name)[0] if images else "unknown"
         return f"image-{stem}"
     if scope == "batch":
-        batch = db.query(Batch).filter(Batch.id == batch_id, Batch.created_by == created_by).first()
+        q = db.query(Batch).filter(Batch.id == batch_id)
+        if created_by is not None:
+            q = q.filter(Batch.created_by == created_by)
+        batch = q.first()
         return f"batch-{batch.name if batch else 'unknown'}"
     return "all"
 

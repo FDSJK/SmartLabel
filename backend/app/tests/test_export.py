@@ -166,3 +166,20 @@ def test_generate_export_all_formats(client, tmp_work_dir):
     assert len(doc["categories"]) == 2                    # cat + dog（bird 不是库中标签）
     labelme = json.load(open(labelme_path))
     assert labelme["labelStatus"] == {"cat": "present", "dog": "absent", "bird": "pending"}
+
+
+def test_scope_name_batch_owned_created_by_none(client):
+    # created_by=None 时不应过滤；带真实 owner 的 batch 仍应返回其名字
+    from app.main import app
+    from app.core.db import get_db
+    from app.models.batch import Batch
+    from app.services.exporter import _scope_name
+
+    db = next(app.dependency_overrides[get_db]())
+    batch = Batch(name="owned", source="upload", created_by=1)
+    db.add(batch)
+    db.commit()
+    db.refresh(batch)
+    name = _scope_name(db, "batch", None, batch.id, [])
+    db.close()
+    assert name == "batch-owned"
