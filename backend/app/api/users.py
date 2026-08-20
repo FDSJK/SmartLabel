@@ -7,6 +7,8 @@ from app.models.image import Image
 from app.models.batch import Batch
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, WorkDirUpdate
 from app.api.deps import require_admin, get_current_user
+from app.services.scanner import cleanup_missing_batches
+from app.services.work_dir import get_work_dir
 
 router = APIRouter()
 
@@ -31,6 +33,8 @@ def update_my_work_dir(
     current_user: User = Depends(get_current_user),
 ):
     current_user.work_dir = body.work_dir
+    # 切换工作目录后，清理数据库里在新目录下已不存在的批次（含其图像）
+    cleanup_missing_batches(get_work_dir(db, current_user), db, created_by=current_user.id)
     db.commit()
     db.refresh(current_user)
     return current_user

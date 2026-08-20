@@ -147,6 +147,30 @@ def test_delete_unauthenticated_returns_401(client: TestClient):
     assert resp.status_code == 401
 
 
+def test_update_work_dir_reconciles_batches(client, tmp_work_dir):
+    import os
+    token = _create_admin(client)
+    from app.main import app
+    from app.core.db import get_db
+    from app.models.user import User
+    from app.models.batch import Batch
+
+    db = next(app.dependency_overrides[get_db]())
+    admin = db.query(User).filter(User.username == "admin1").one()
+    db.add(Batch(name="old-batch", source="upload", created_by=admin.id))
+    db.commit()
+    db.close()
+
+    new_dir = os.path.join(tmp_work_dir, "new-empty")
+    os.makedirs(new_dir, exist_ok=True)
+    h = {"Authorization": f"Bearer {token}"}
+    resp = client.put("/api/users/me/work_dir", json={"work_dir": new_dir}, headers=h)
+    assert resp.status_code == 200
+
+    r = client.get("/api/batches", headers=h)
+    assert r.json() == []
+
+
 def test_create_user_cannot_be_admin(client):
     token = _create_admin(client)
     resp = client.post(

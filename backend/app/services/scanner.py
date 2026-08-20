@@ -85,7 +85,16 @@ def scan_batches(work_dir: str, db: Session, created_by: int | None = None) -> d
             db.add(image)
             result["added"] += 1
 
-    # 清理：工作目录里已不存在的批次（文件夹被外部删除）→ 移除其 DB 记录
+    result["removed"] = cleanup_missing_batches(work_dir, db, created_by)
+
+    db.commit()
+    return result
+
+
+def cleanup_missing_batches(work_dir: str, db: Session, created_by: int | None = None) -> int:
+    """移除数据库里「工作目录中已不存在」的批次（及其图像）。返回清理数量。"""
+    batches_dir = os.path.join(work_dir, "batches")
+    removed = 0
     q = db.query(Batch)
     if created_by is not None:
         q = q.filter(Batch.created_by == created_by)
@@ -93,7 +102,5 @@ def scan_batches(work_dir: str, db: Session, created_by: int | None = None) -> d
         if not os.path.isdir(os.path.join(batches_dir, batch.name)):
             db.query(Image).filter(Image.batch_id == batch.id).delete()
             db.delete(batch)
-            result["removed"] += 1
-
-    db.commit()
-    return result
+            removed += 1
+    return removed
