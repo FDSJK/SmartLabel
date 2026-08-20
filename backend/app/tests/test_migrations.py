@@ -58,3 +58,22 @@ def test_migrations_idempotent(tmp_path):
     run_migrations(engine)
     run_migrations(engine)  # 第二次不应抛错
     engine.dispose()
+
+
+def test_startup_migrates_old_db(tmp_path, monkeypatch):
+    """老库（无 work_dir 列）启动时应先迁移、再执行 admin 查询，不报错。"""
+    _make_pre_v2_db(str(tmp_path / "metadata.db"))
+
+    from app.core.config import Settings
+    from app.main import app
+    monkeypatch.setattr("app.main.settings", Settings(WORK_DIR=str(tmp_path), SECRET_KEY="test"))
+
+    from fastapi.testclient import TestClient
+    with TestClient(app):  # 触发 lifespan，应不抛异常
+        pass
+
+    engine = create_engine(f"sqlite:///{tmp_path}/metadata.db")
+    with engine.connect() as conn:
+        cols = [r[1] for r in conn.execute(text("PRAGMA table_info(users)"))]
+        assert "work_dir" in cols
+    engine.dispose()

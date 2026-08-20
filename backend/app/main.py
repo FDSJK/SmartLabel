@@ -13,6 +13,7 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.WORK_DIR, exist_ok=True)
     init_db(settings.DATABASE_URL)
     Base.metadata.create_all(bind=get_engine())
+    run_migrations(get_engine())
 
     from sqlalchemy.orm import Session as DBSession
     from app.core.security import hash_password
@@ -28,8 +29,6 @@ async def lifespan(app: FastAPI):
             )
             db.add(admin)
             db.commit()
-
-    run_migrations(get_engine())
 
     yield
 
