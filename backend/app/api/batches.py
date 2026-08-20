@@ -9,7 +9,7 @@ from app.models.image import Image
 from app.models.user import User
 from app.schemas.batch import BatchCreate, BatchResponse
 from app.schemas.image import ImageResponse
-from app.api.deps import get_current_user, get_owned_batch, get_owned_image
+from app.api.deps import get_current_user, get_owned_batch, get_owned_image, require_work_dir
 from app.services.scanner import scan_batches
 from app.services.mask_import import import_batch_masks, import_all_batches
 from app.services.work_dir import get_work_dir
@@ -70,7 +70,7 @@ def list_batches(
 def create_batch(
     body: BatchCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_work_dir),
 ):
     existing = db.query(Batch).filter(Batch.name == body.name, Batch.created_by == current_user.id).first()
     if existing:
@@ -114,7 +114,7 @@ def delete_batch(
 @router.post("/batches/scan")
 def trigger_scan(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_work_dir),
 ):
     work_dir = get_work_dir(db, current_user)
     result = scan_batches(work_dir, db, created_by=current_user.id)
@@ -130,7 +130,7 @@ async def upload_images(
     batch_id: int,
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_work_dir),
 ):
     batch = get_owned_batch(db, current_user, batch_id)
 
@@ -200,7 +200,7 @@ def list_images(
 def import_masks(
     batch_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_work_dir),
 ):
     batch = get_owned_batch(db, current_user, batch_id)
 

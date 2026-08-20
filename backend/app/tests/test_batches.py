@@ -8,7 +8,8 @@ def _admin_token(client: TestClient) -> str:
     from app.core.db import get_db
 
     db = next(app.dependency_overrides[get_db]())
-    user = User(username="admin1", password_hash=hash_password("admin1234"), role="admin")
+    from app.core.config import settings
+    user = User(username="admin1", password_hash=hash_password("admin1234"), role="admin", work_dir=settings.WORK_DIR)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -21,7 +22,9 @@ def _auth(token: str) -> dict:
 
 def _annotator_token(client, username):
     resp = client.post("/api/auth/register", json={"username": username, "password": "pass1234"})
-    return resp.json()["access_token"]
+    token = resp.json()["access_token"]
+    client.put("/api/users/me/work_dir", json={"work_dir": "/tmp/annotator-workdir"}, headers=_auth(token))
+    return token
 
 
 class TestCreateBatch:
@@ -42,8 +45,7 @@ class TestCreateBatch:
         assert resp.status_code == 409
 
     def test_create_batch_as_annotator(self, client: TestClient):
-        resp = client.post("/api/auth/register", json={"username": "ann1", "password": "pass1234"})
-        token = resp.json()["access_token"]
+        token = _annotator_token(client, "ann1")
         resp = client.post("/api/batches", json={"name": "mine"}, headers=_auth(token))
         assert resp.status_code == 201
         data = resp.json()
@@ -103,8 +105,7 @@ class TestDeleteBatch:
         assert resp.status_code == 404
 
     def test_delete_batch_as_annotator(self, client: TestClient):
-        resp = client.post("/api/auth/register", json={"username": "ann_del", "password": "pass1234"})
-        token = resp.json()["access_token"]
+        token = _annotator_token(client, "ann_del")
         create = client.post("/api/batches", json={"name": "mine-del"}, headers=_auth(token))
         batch_id = create.json()["id"]
         resp = client.delete(f"/api/batches/{batch_id}", headers=_auth(token))
@@ -130,3 +131,10 @@ def test_same_batch_name_conflict_within_user(client):
     t1 = _annotator_token(client, "annE")
     client.post("/api/batches", json={"name": "dup"}, headers=_auth(t1))
     assert client.post("/api/batches", json={"name": "dup"}, headers=_auth(t1)).status_code == 409
+
+
+def test_scan_requires_work_dir(client):
+    resp = client.post("/api/auth/register", json={"username": "nowd", "password": "pass1234"})
+    token = resp.json()["access_token"]
+    r = client.post("/api/batches/scan", headers=_auth(token))
+    assert r.status_code == 400

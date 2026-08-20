@@ -11,7 +11,8 @@ def _admin_token(client: TestClient) -> str:
     from app.core.db import get_db
 
     db = next(app.dependency_overrides[get_db]())
-    user = User(username="admin1", password_hash=hash_password("admin1234"), role="admin")
+    from app.core.config import settings
+    user = User(username="admin1", password_hash=hash_password("admin1234"), role="admin", work_dir=settings.WORK_DIR)
     db.add(user)
     db.commit()
     db.refresh(user)

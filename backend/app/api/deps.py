@@ -44,6 +44,15 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def require_work_dir(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.work_dir or not current_user.work_dir.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请先在「设置」页配置工作目录",
+        )
+    return current_user
+
+
 def get_owned_batch(db, user, batch_id) -> Batch:
     batch = db.query(Batch).filter(Batch.id == batch_id, Batch.created_by == user.id).first()
     if not batch:

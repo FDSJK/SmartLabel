@@ -13,8 +13,12 @@ export default function BatchSelector() {
   useEffect(() => { loadBatches(); }, [loadBatches]);
 
   const handleScan = async () => {
-    const result = await doScan();
-    alert(`扫描完成：新增 ${result.added}，跳过 ${result.skipped}，清理 ${result.removed}`);
+    try {
+      const result = await doScan();
+      alert(`扫描完成：新增 ${result.added}，跳过 ${result.skipped}，清理 ${result.removed}`);
+    } catch (err) {
+      alert(err instanceof ApiError ? err.detail : '扫描失败');
+    }
   };
 
   const handleUploadClick = () => {
@@ -41,8 +45,8 @@ export default function BatchSelector() {
       } else if (uploadTarget.current === 'new' && batchNameRef.current) {
         await doCreateAndUpload(batchNameRef.current, files);
       }
-    } catch {
-      alert('上传失败');
+    } catch (err) {
+      alert(err instanceof ApiError ? err.detail : '上传失败');
     }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = '';
