@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchMe, updateMyWorkDir } from '../api/users';
 import { useBatchStore } from '../stores/batchStore';
+import { useImageStore } from '../stores/imageStore';
 import { ApiError } from '../api/client';
 import styles from './MySettingsPage.module.css';
 
@@ -18,8 +19,9 @@ export default function MySettingsPage() {
     setError('');
     try {
       await updateMyWorkDir(workDir);
-      // 工作目录已切换：清空当前选中，回到标注页刷新批次列表
+      // 工作目录已切换：清空批次、图像列表和画布，回到标注页刷新
       useBatchStore.getState().deselectBatch();
+      useImageStore.getState().clearImage();
       navigate('/');
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : '保存失败');
