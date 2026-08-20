@@ -31,7 +31,6 @@ export const useImageStore = create<ImageState>((set, get) => ({
 
   loadImage: async (imageId) => {
     const state = get();
-    console.log('[loadImage] imageId=', imageId);
     // Release previous lock if any
     if (state.currentImage && state.lockedByMe) {
       await state.releaseCurrentLock();
