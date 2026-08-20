@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { apiClient } from '../api/client';
 import { loginApi, registerApi } from '../api/auth';
+import { useBatchStore } from './batchStore';
+import { useImageStore } from './imageStore';
 
 interface AuthState {
   user: { username: string; role: string } | null;
@@ -61,6 +63,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     apiClient.setToken(null);
     localStorage.removeItem('ling_token');
     localStorage.removeItem('ling_user');
+    // 清空标注相关状态（批次、图像、画布、标注），避免切换账号后残留旧数据
+    useBatchStore.getState().reset();
+    useImageStore.getState().clearImage();
     set({ user: null, token: null, isAuthenticated: false });
   },
 

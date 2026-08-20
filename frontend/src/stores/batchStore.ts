@@ -15,6 +15,7 @@ interface BatchState {
   doUploadToBatch: (batchId: number, files: File[]) => Promise<void>;
   doDeleteBatch: (batchId: number) => Promise<void>;
   deselectBatch: () => void;
+  reset: () => void;
   updateImageLock: (imageId: number, lockedBy: string | null) => void;
 }
 
@@ -41,6 +42,10 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 
   deselectBatch: () => {
     set({ currentBatchId: null, images: [] });
+  },
+
+  reset: () => {
+    set({ batches: [], currentBatchId: null, images: [], loading: false });
   },
 
   doScan: async () => {
