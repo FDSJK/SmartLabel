@@ -86,3 +86,25 @@ def test_seeded_admin_exists(client: TestClient):
     assert resp.status_code == 200
     users = resp.json()
     assert any(u["username"] == "admin" and u["role"] == "admin" for u in users)
+
+
+def test_update_work_dir_reconciles_batches(client, tmp_work_dir):
+    import os
+    token = _admin_token(client)
+    from app.main import app
+    from app.core.db import get_db
+    from app.models.batch import Batch
+
+    db = next(app.dependency_overrides[get_db]())
+    db.add(Batch(name="old-batch", source="upload"))
+    db.commit()
+    db.close()
+
+    new_dir = os.path.join(tmp_work_dir, "new-empty")
+    os.makedirs(new_dir, exist_ok=True)
+    h = {"Authorization": f"Bearer {token}"}
+    resp = client.put("/api/settings/WORK_DIR", json={"value": new_dir}, headers=h)
+    assert resp.status_code == 200
+
+    r = client.get("/api/batches", headers=h)
+    assert r.json() == []
