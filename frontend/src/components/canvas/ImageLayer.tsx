@@ -23,6 +23,7 @@ export default function ImageLayer() {
     async function load() {
       setError(false);
       setImageElement(null);
+      console.log('[ImageLayer] fetch id=', currentImage?.id, 'file_name=', currentImage?.file_name);
 
       try {
         const token = apiClient.getToken();
@@ -41,6 +42,7 @@ export default function ImageLayer() {
         const img = new window.Image();
         img.onload = () => {
           if (cancelled) return;
+          console.log('[ImageLayer] onload id=', currentImage?.id);
           URL.revokeObjectURL(url);
           setImageElement(img);
         };
