@@ -42,3 +42,13 @@ def test_upload_onnx(client, tmp_work_dir, monkeypatch):
     assert r.status_code == 200
     import os
     assert os.path.isfile(os.path.join(tmp_work_dir, r.json()["filename"]))
+
+
+def test_update_model_name_conflict_409(client):
+    token = _admin_token(client)
+    b1 = {"name": "m1", "source": "path", "model_path": "/x1.onnx"}
+    b2 = {"name": "m2", "source": "path", "model_path": "/x2.onnx"}
+    id1 = client.post("/api/models", json=b1, headers=_auth(token)).json()["id"]
+    client.post("/api/models", json=b2, headers=_auth(token))
+    r = client.put(f"/api/models/{id1}", json={**b1, "name": "m2"}, headers=_auth(token))
+    assert r.status_code == 409

@@ -36,6 +36,9 @@ def update_model(model_id: int, body: ModelConfigUpdate, db: Session = Depends(g
     cfg = db.query(ModelConfig).filter(ModelConfig.id == model_id).first()
     if not cfg:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
+    existing = db.query(ModelConfig).filter(ModelConfig.name == body.name, ModelConfig.id != model_id).first()
+    if existing:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Model name already exists")
     for k, v in body.model_dump().items():
         setattr(cfg, k, v)
     cfg.updated_at = datetime.now(timezone.utc)
