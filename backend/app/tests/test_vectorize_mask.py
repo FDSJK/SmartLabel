@@ -60,3 +60,13 @@ def test_vectorize_donut_preserves_hole(tmp_path):
     hy = [p[1] for p in polys[0]["holes"][0]]
     assert 38 <= min(hx) <= 42 and 58 <= max(hx) <= 62
     assert 38 <= min(hy) <= 42 and 58 <= max(hy) <= 62
+
+
+def test_vectorize_array_donut_preserves_hole():
+    from app.services.mask_import import vectorize_array
+    arr = np.zeros((100, 100), dtype=np.uint8)
+    arr[20:80, 20:80] = 255
+    arr[40:60, 40:60] = 0
+    polys = vectorize_array(arr)
+    assert len(polys) == 1
+    assert len(polys[0]["holes"]) == 1

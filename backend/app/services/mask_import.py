@@ -17,16 +17,7 @@ MIN_CONTOUR_AREA = 4.0
 DEFAULT_THRESHOLD = 128
 
 
-def vectorize_mask(mask_path: str, threshold: int = DEFAULT_THRESHOLD) -> list[dict]:
-    """把一张二值 mask 图转成多边形列表，每个多边形为 {"points": 外环, "holes": [内环, ...]}。
-
-    先转灰度、以 threshold 为界二值化（处理 JPG 有损压缩的边缘插值），
-    再用 OpenCV 提取内外轮廓（RETR_CCOMP）并做多边形简化，把孔洞归到其外环下。
-    """
-    img = PILImage.open(mask_path).convert("L")
-    arr = np.array(img, dtype=np.uint8)
-    binary = (arr > threshold).astype(np.uint8) * 255
-
+def _vectorize_binary(binary: np.ndarray) -> list[dict]:
     contours, hierarchy = cv2.findContours(binary, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
     # 先对每个轮廓做简化 + 过滤，记录存活轮廓（原索引 -> pts）
@@ -55,6 +46,25 @@ def vectorize_mask(mask_path: str, threshold: int = DEFAULT_THRESHOLD) -> list[d
             outer_by_idx[parent]["holes"].append(pts)
 
     return polygons
+
+
+def vectorize_array(binary: np.ndarray) -> list[dict]:
+    """二进制 mask 数组（0/255，单通道）→ 多边形列表（含孔洞）。"""
+    if binary.ndim == 3:
+        binary = binary[:, :, 0]
+    return _vectorize_binary(binary.astype(np.uint8))
+
+
+def vectorize_mask(mask_path: str, threshold: int = DEFAULT_THRESHOLD) -> list[dict]:
+    """把一张二值 mask 图转成多边形列表，每个多边形为 {"points": 外环, "holes": [内环, ...]}。
+
+    先转灰度、以 threshold 为界二值化（处理 JPG 有损压缩的边缘插值），
+    再用 OpenCV 提取内外轮廓（RETR_CCOMP）并做多边形简化，把孔洞归到其外环下。
+    """
+    img = PILImage.open(mask_path).convert("L")
+    arr = np.array(img, dtype=np.uint8)
+    binary = (arr > threshold).astype(np.uint8) * 255
+    return vectorize_array(binary)
 
 
 def _get_or_create_label(db: Session, name: str) -> tuple[Label, bool]:
