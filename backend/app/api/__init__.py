@@ -9,6 +9,7 @@ from app.api.locks import router as locks_router
 from app.api.annotations import router as annotations_router
 from app.api.export import router as export_router
 from app.api.stats import router as stats_router
+from app.api.models import router as models_router
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(auth_router, tags=["auth"])
@@ -21,6 +22,7 @@ api_router.include_router(locks_router, tags=["locks"])
 api_router.include_router(annotations_router, tags=["annotations"])
 api_router.include_router(export_router, tags=["export"])
 api_router.include_router(stats_router, tags=["stats"])
+api_router.include_router(models_router, tags=["models"])
 
 
 @api_router.get("/health")
