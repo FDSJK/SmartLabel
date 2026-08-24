@@ -1,4 +1,5 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import BatchSelector from '../components/panels/BatchSelector';
 import ImageList from '../components/panels/ImageList';
 import KonvaStage from '../components/canvas/KonvaStage';
@@ -23,6 +24,33 @@ export default function AnnotationPage() {
   const toggleRightPanel = useUIStore(s => s.toggleRightPanel);
   const exportOpen = useUIStore(s => s.exportDialogOpen);
   const openExportDialog = useUIStore(s => s.openExportDialog);
+
+  // 左右栏宽度（可拖动分割线调整）
+  const [leftWidth, setLeftWidth] = useState(280);
+  const [rightWidth, setRightWidth] = useState(320);
+  const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
+
+  const startDrag = (e: ReactMouseEvent, side: 'left' | 'right') => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = side === 'left' ? leftWidth : rightWidth;
+    setDragging(side);
+    document.body.style.userSelect = 'none';
+    const onMove = (ev: MouseEvent) => {
+      const w = side === 'left' ? startW + (ev.clientX - startX) : startW - (ev.clientX - startX);
+      const clamped = Math.min(560, Math.max(160, w));
+      if (side === 'left') setLeftWidth(clamped);
+      else setRightWidth(clamped);
+    };
+    const onUp = () => {
+      setDragging(null);
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
 
   // Init: load labels
   useEffect(() => {
@@ -167,7 +195,10 @@ export default function AnnotationPage() {
     <div className={styles.page}>
       <div className={styles.main}>
         {/* Left panel */}
-        <aside className={`${styles.sidebar} ${styles.sidebarLeft} ${leftCollapsed ? styles.collapsed : ''}`}>
+        <aside
+          className={`${styles.sidebar} ${styles.sidebarLeft} ${leftCollapsed ? styles.collapsed : ''}`}
+          style={leftCollapsed ? undefined : { width: leftWidth, transition: dragging === 'left' ? 'none' : undefined }}
+        >
           <div className={styles.sidebarHeader}>
             <button
               className={styles.toggle}
@@ -189,15 +220,20 @@ export default function AnnotationPage() {
             </div>
           )}
         </aside>
+        {!leftCollapsed && <div className={styles.divider} onMouseDown={(e) => startDrag(e, 'left')} />}
 
         {/* Center — canvas + floating controls */}
         <div className={styles.center}>
           <KonvaStage />
           <CanvasControls />
         </div>
+        {!rightCollapsed && <div className={styles.divider} onMouseDown={(e) => startDrag(e, 'right')} />}
 
         {/* Right panel */}
-        <aside className={`${styles.sidebar} ${styles.sidebarRight} ${rightCollapsed ? styles.collapsed : ''}`}>
+        <aside
+          className={`${styles.sidebar} ${styles.sidebarRight} ${rightCollapsed ? styles.collapsed : ''}`}
+          style={rightCollapsed ? undefined : { width: rightWidth, transition: dragging === 'right' ? 'none' : undefined }}
+        >
           <div className={styles.sidebarHeader}>
             <button
               className={styles.toggle}
