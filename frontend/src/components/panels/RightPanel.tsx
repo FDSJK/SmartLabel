@@ -3,6 +3,7 @@ import { useEditorStore } from '../../stores/editorStore';
 import { useDraftStore } from '../../stores/draftStore';
 import { useLabelStore } from '../../stores/labelStore';
 import LabelStatusList from './LabelStatusList';
+import InferencePanel from './InferencePanel';
 import type { EditorTool } from '../../types/shapes';
 import styles from './RightPanel.module.css';
 
@@ -97,6 +98,9 @@ export default function RightPanel() {
           </p>
         )}
       </div>
+
+      {/* Inference trigger */}
+      <InferencePanel />
 
       {/* Tabs: label status / shape list */}
       <div className={styles.tabs}>

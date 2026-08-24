@@ -11,6 +11,7 @@ import { useDraftStore } from '../stores/draftStore';
 import { useImageStore } from '../stores/imageStore';
 import { useUIStore } from '../stores/uiStore';
 import { useAutoSave } from '../hooks/useAutoSave';
+import { useDraftAutoSave } from '../hooks/useDraftAutoSave';
 import { apiClient } from '../api/client';
 import styles from './AnnotationPage.module.css';
 
@@ -30,6 +31,7 @@ export default function AnnotationPage() {
 
   // Auto-save
   useAutoSave();
+  useDraftAutoSave();
 
   // --- beforeunload: release lock + warn unsaved ---
   useEffect(() => {
