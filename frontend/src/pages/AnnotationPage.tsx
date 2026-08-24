@@ -7,6 +7,7 @@ import CanvasControls from '../components/toolbar/CanvasControls';
 import ExportDialog from '../components/panels/ExportDialog';
 import { useLabelStore } from '../stores/labelStore';
 import { useEditorStore } from '../stores/editorStore';
+import { useDraftStore } from '../stores/draftStore';
 import { useImageStore } from '../stores/imageStore';
 import { useUIStore } from '../stores/uiStore';
 import { useAutoSave } from '../hooks/useAutoSave';
@@ -95,8 +96,10 @@ export default function AnnotationPage() {
       return;
     }
 
-    // Delete / Backspace — delete selected shape
+    // Delete / Backspace — delete selected shape (draft first, then confirmed)
     if (e.key === 'Delete' || e.key === 'Backspace') {
+      const draft = useDraftStore.getState();
+      if (draft.selectedDraftId) { draft.deleteDraftShape(draft.selectedDraftId); return; }
       if (store.selectedShapeId) {
         store.deleteSelectedShape();
       }

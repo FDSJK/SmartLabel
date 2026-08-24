@@ -1,6 +1,7 @@
 import { useRef, useCallback, useState } from 'react';
 import { Circle, Line, Rect, Group } from 'react-konva';
 import { useEditorStore } from '../../stores/editorStore';
+import { useDraftStore } from '../../stores/draftStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useLabelStore } from '../../stores/labelStore';
 import { useImageStore } from '../../stores/imageStore';
@@ -58,7 +59,7 @@ export default function DrawingLayer() {
   const drawingPoints = useEditorStore(s => s.drawingPoints);
   const shapes = useEditorStore(s => s.shapes);
   const selectedShapeId = useEditorStore(s => s.selectedShapeId);
-  const showDraft = useUIStore(s => s.showDraft);
+  const showMask = useUIStore(s => s.showMask);
   const labels = useLabelStore(s => s.labels);
   const currentImage = useImageStore(s => s.currentImage);
 
@@ -79,6 +80,7 @@ export default function DrawingLayer() {
     vertexIndex?: number;
     startPoints: number[][];
     startHoles?: number[][][];
+    isDraft?: boolean;
     startPos: [number, number];
   } | null>(null);
   const mousedownPos = useRef<[number, number] | null>(null);
@@ -97,7 +99,7 @@ export default function DrawingLayer() {
   const isSelecting = currentTool === 'select';
   const isAdding = currentTool === 'add';
   const isCutting = currentTool === 'cut';
-  const drawingActive = selectedLabel !== null && isDrawing && currentImage !== null && showDraft;
+  const drawingActive = selectedLabel !== null && isDrawing && currentImage !== null && showMask;
   const editActive = isSelecting && currentImage !== null;
   const boolOpActive = (isAdding || isCutting) && currentImage !== null;
   const boolCanDraw = boolOpActive && selectedShapeId !== null;
@@ -214,6 +216,32 @@ export default function DrawingLayer() {
           dragStarted.current = true;
           let hit = false;
 
+          // Draft selection takes priority (draft renders on top)
+          const selectedDraftId = useDraftStore.getState().selectedDraftId;
+          if (selectedDraftId) {
+            const drafts = useDraftStore.getState().draftShapes;
+            const selDraft = drafts.find(s => s.id === selectedDraftId);
+            if (selDraft) {
+              const v = findNearestVertex(sx, sy, [selDraft], VERTEX_HIT_RADIUS);
+              if (v) {
+                hit = true;
+                dragRef.current = {
+                  type: 'vertex', shapeId: v.shapeId, vertexIndex: v.vertexIndex,
+                  startPoints: selDraft.points.map(p => [...p]), startPos: [ix, iy], isDraft: true,
+                };
+              } else if (isPointInShape(sx, sy, selDraft.points, selDraft.holes ?? [])) {
+                hit = true;
+                dragRef.current = {
+                  type: 'shape', shapeId: selDraft.id,
+                  startPoints: selDraft.points.map(p => [...p]),
+                  startHoles: (selDraft.holes ?? []).map(h => h.map(p => [...p])),
+                  startPos: [ix, iy], isDraft: true,
+                };
+              }
+            }
+          }
+          if (hit) return;
+
           if (selectedShapeId) {
             const selShape = shapes.find(s => s.id === selectedShapeId);
             if (selShape) {
@@ -257,11 +285,13 @@ export default function DrawingLayer() {
           const np = d.startPoints.map(p => [...p]);
           np[d.vertexIndex][0] += dx;
           np[d.vertexIndex][1] += dy;
-          useEditorStore.getState().updateShape(d.shapeId, np);
+          if (d.isDraft) useDraftStore.getState().moveDraftVertex(d.shapeId, d.vertexIndex, np[d.vertexIndex][0], np[d.vertexIndex][1]);
+          else useEditorStore.getState().updateShape(d.shapeId, np);
         } else if (d.type === 'shape') {
           const np = d.startPoints.map(p => [p[0] + dx, p[1] + dy]);
           const nh = (d.startHoles ?? []).map(h => h.map(p => [p[0] + dx, p[1] + dy]));
-          useEditorStore.getState().updateShape(d.shapeId, np, nh);
+          if (d.isDraft) useDraftStore.getState().moveDraftShape(d.shapeId, np, nh);
+          else useEditorStore.getState().updateShape(d.shapeId, np, nh);
         }
         return;
       }
@@ -333,6 +363,19 @@ export default function DrawingLayer() {
       dragStarted.current = false;
       dragRef.current = null;
 
+      // 0) Hit draft first (draft renders on top)
+      const draftShapes = useDraftStore.getState().draftShapes;
+      const dv = findNearestVertex(ix, iy, draftShapes, DBLCLICK_HIT_RADIUS);
+      if (dv) { useDraftStore.getState().selectDraft(dv.shapeId); return; }
+      const dEdge = findNearestShape(ix, iy, draftShapes, DBLCLICK_HIT_RADIUS);
+      if (dEdge) { useDraftStore.getState().selectDraft(dEdge); return; }
+      for (const dShape of draftShapes) {
+        if (isPointInShape(ix, iy, dShape.points, dShape.holes ?? [])) {
+          useDraftStore.getState().selectDraft(dShape.id);
+          return;
+        }
+      }
+
       const store = useEditorStore.getState();
       const currentShapes = store.shapes;
 
@@ -340,23 +383,27 @@ export default function DrawingLayer() {
       const v = findNearestVertex(ix, iy, currentShapes, DBLCLICK_HIT_RADIUS);
       if (v) {
         store.selectShape(v.shapeId);
+        useDraftStore.getState().selectDraft(null);
         return;
       }
       // 2) Check edges
       const edgeId = findNearestShape(ix, iy, currentShapes, DBLCLICK_HIT_RADIUS);
       if (edgeId) {
         store.selectShape(edgeId);
+        useDraftStore.getState().selectDraft(null);
         return;
       }
       // 3) Check if point is inside any shape
       for (const shape of currentShapes) {
         if (isPointInShape(ix, iy, shape.points, shape.holes ?? [])) {
           store.selectShape(shape.id);
+          useDraftStore.getState().selectDraft(null);
           return;
         }
       }
       // Double-click on empty → deselect
       store.selectShape(null);
+      useDraftStore.getState().selectDraft(null);
     },
     [isSelecting, isAdding, isCutting],
   );
@@ -404,6 +451,12 @@ export default function DrawingLayer() {
   const selectedShapeColor = selectedShape
     ? (labels.find(l => l.name === selectedShape.label)?.color || '#00e5ff')
     : '#00e5ff';
+
+  const selectedDraftId = useDraftStore(s => s.selectedDraftId);
+  const draftShapes = useDraftStore(s => s.draftShapes);
+  const selectedDraft = selectedDraftId
+    ? (draftShapes.find(s => s.id === selectedDraftId) ?? null)
+    : null;
 
   const imgW = currentImage?.width || 4096;
   const imgH = currentImage?.height || 4096;
@@ -516,6 +569,52 @@ export default function DrawingLayer() {
             onTap={() => { useEditorStore.getState().deleteSelectedShape(); }}
             listening={true}>
             <Circle radius={btnR} fill="#f44336" stroke="white" strokeWidth={1.5} />
+            <Line points={[-4, -4, 4, 4]} stroke="white" strokeWidth={2} lineCap="round" listening={false} />
+            <Line points={[4, -4, -4, 4]} stroke="white" strokeWidth={2} lineCap="round" listening={false} />
+          </Group>
+        );
+      })()}
+
+      {/* Selected draft outline — select mode */}
+      {isSelecting && selectedDraft && (
+        <Line
+          points={selectedDraft.points.flat()}
+          closed
+          stroke="#2196f3"
+          strokeWidth={4}
+          dash={[6, 3]}
+          lineJoin="round"
+          shadowColor="#2196f3"
+          shadowBlur={10}
+          listening={false}
+        />
+      )}
+
+      {/* Select: draft vertex handles */}
+      {isSelecting && selectedDraft &&
+        selectedDraft.points.map(([x, y], i) => (
+          <Circle key={`dv-${i}`} x={x} y={y}
+            radius={VERTEX_RADIUS}
+            fill="white" stroke="#2196f3"
+            strokeWidth={2}
+            listening={false} />
+        ))}
+
+      {/* Select: draft delete button */}
+      {isSelecting && selectedDraft && (() => {
+        const pts = selectedDraft.points;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const [x, y] of pts) {
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+        const btnR = 10;
+        return (
+          <Group x={(minX + maxX) / 2} y={minY - btnR - 6}
+            onClick={() => { useDraftStore.getState().deleteDraftShape(selectedDraft.id); }}
+            onTap={() => { useDraftStore.getState().deleteDraftShape(selectedDraft.id); }}
+            listening={true}>
+            <Circle radius={btnR} fill="#2196f3" stroke="white" strokeWidth={1.5} />
             <Line points={[-4, -4, 4, 4]} stroke="white" strokeWidth={2} lineCap="round" listening={false} />
             <Line points={[4, -4, -4, 4]} stroke="white" strokeWidth={2} lineCap="round" listening={false} />
           </Group>
