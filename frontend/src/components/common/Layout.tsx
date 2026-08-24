@@ -24,6 +24,7 @@ export default function Layout() {
             <>
               <Link to="/admin/users">用户管理</Link>
               <Link to="/admin/labels">标签管理</Link>
+              <Link to="/admin/models">模型配置</Link>
             </>
           )}
         </nav>
