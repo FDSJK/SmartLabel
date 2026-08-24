@@ -16,6 +16,7 @@ export default function InferencePanel() {
   const [notice, setNotice] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const batchPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentImage = useImageStore((s) => s.currentImage);
   const currentBatchId = useBatchStore((s) => s.currentBatchId);
@@ -30,20 +31,34 @@ export default function InferencePanel() {
   useEffect(() => () => {
     if (pollRef.current) clearInterval(pollRef.current);
     if (batchPollRef.current) clearInterval(batchPollRef.current);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
   }, []);
+
+  // 一次性提示：5 秒后自动消失
+  const flashNotice = (text: string) => {
+    setNotice(text);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(''), 5000);
+  };
 
   const startPolling = (jobId: number, imageId: number) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       const j = await getJob(jobId);
-      setJob(j);
       useInferenceStore.getState().setJob(j);
-      if (j.status === 'done' || j.status === 'failed') {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setBusy(false);
-        if (j.status === 'done') {
-          useDraftStore.getState().loadDraft(imageId);
-        }
+      if (j.status === 'queued' || j.status === 'running') {
+        setJob(j);
+        return;
+      }
+      // done / failed
+      if (pollRef.current) clearInterval(pollRef.current);
+      setBusy(false);
+      if (j.status === 'done') {
+        useDraftStore.getState().loadDraft(imageId);
+        setJob(null);
+        flashNotice('推理完成');
+      } else {
+        setJob(j); // 失败：保留，显示错误 + 重试
       }
     }, 1500);
   };
@@ -66,7 +81,7 @@ export default function InferencePanel() {
       startPolling(r.jobId, currentImage.id);
     } catch (e) {
       setBusy(false);
-      setNotice(`触发失败：${(e as Error).message}`);
+      flashNotice(`触发失败：${(e as Error).message}`);
     }
   };
 
@@ -76,16 +91,19 @@ export default function InferencePanel() {
     try {
       const r = await triggerBatchInference(modelId, currentBatchId);
       setBusy(false);
-      setNotice(`已排队 ${r.queued} 张，后台推理中`);
+      flashNotice(`已排队 ${r.queued} 张，后台推理中`);
       startBatchPolling(currentBatchId);
     } catch (e) {
       setBusy(false);
-      setNotice(`触发失败：${(e as Error).message}`);
+      flashNotice(`触发失败：${(e as Error).message}`);
     }
   };
 
   const statusText = job
-    ? { queued: '排队中', running: '推理中', done: '完成', failed: `失败：${job.error}` }[job.status]
+    ? job.status === 'failed' ? `失败：${job.error}`
+    : job.status === 'queued' ? '排队中'
+    : job.status === 'running' ? '推理中'
+    : ''
     : '';
 
   return (

@@ -60,6 +60,16 @@
   font-weight: 600;
 }
 
+.tabDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-error, #f44336);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
 /* Tool buttons */
 .toolGroup {
   display: flex;

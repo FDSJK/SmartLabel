@@ -21,7 +21,7 @@ const TOOLS: ToolButton[] = [
   { tool: 'cut', label: '- 裁剪', shortcut: 'X' },
 ];
 
-type PanelTab = 'status' | 'shapes';
+type PanelTab = 'status' | 'shapes' | 'inference';
 
 export default function RightPanel() {
   const [tab, setTab] = useState<PanelTab>('shapes');
@@ -32,6 +32,7 @@ export default function RightPanel() {
   const selectShape = useEditorStore(s => s.selectShape);
   const selectedLabel = useEditorStore(s => s.selectedLabel);
   const labels = useLabelStore(s => s.labels);
+  const draftReady = useDraftStore(s => s.status === 'ready');
 
   // Label color lookup
   const colorMap = new Map<string, string>();
@@ -99,10 +100,7 @@ export default function RightPanel() {
         )}
       </div>
 
-      {/* Inference trigger */}
-      <InferencePanel />
-
-      {/* Tabs: label status / shape list */}
+      {/* Tabs: label status / shape list / inference */}
       <div className={styles.tabs}>
         <button
           className={`${styles.tab} ${tab === 'status' ? styles.tabActive : ''}`}
@@ -116,12 +114,21 @@ export default function RightPanel() {
         >
           标注 ({visibleShapes.length})
         </button>
+        <button
+          className={`${styles.tab} ${tab === 'inference' ? styles.tabActive : ''}`}
+          onClick={() => setTab('inference')}
+        >
+          预分割
+          {draftReady && <span className={styles.tabDot} />}
+        </button>
       </div>
 
       {/* Tab content */}
       <div className={styles.sectionGrow}>
         {tab === 'status' ? (
           <LabelStatusList />
+        ) : tab === 'inference' ? (
+          <InferencePanel />
         ) : visibleShapes.length === 0 ? (
           <p className={styles.hint}>
             {selectedLabel
