@@ -23,7 +23,7 @@ export default function InferencePanel() {
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
-  const startPolling = (jobId: number) => {
+  const startPolling = (jobId: number, imageId: number) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       const j = await getJob(jobId);
@@ -32,8 +32,7 @@ export default function InferencePanel() {
         if (pollRef.current) clearInterval(pollRef.current);
         setBusy(false);
         if (j.status === 'done') {
-          const img = useImageStore.getState().currentImage;
-          if (img) useDraftStore.getState().loadDraft(img.id);
+          useDraftStore.getState().loadDraft(imageId);
         }
       }
     }, 1500);
@@ -44,7 +43,7 @@ export default function InferencePanel() {
     setBusy(true); setJob(null); setNotice('');
     try {
       const r = await triggerInference(modelId, currentImage.id);
-      startPolling(r.jobId);
+      startPolling(r.jobId, currentImage.id);
     } catch (e) {
       setBusy(false);
       setNotice(`触发失败：${(e as Error).message}`);

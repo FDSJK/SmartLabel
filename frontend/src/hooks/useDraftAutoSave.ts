@@ -13,14 +13,16 @@ export function useDraftAutoSave() {
       if (!state.isDirty || state.isDirty === prev.isDirty) return;
       const { currentImage, lockedByMe } = useImageStore.getState();
       if (!currentImage || !lockedByMe) return;
+      const imageId = currentImage.id;
 
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(async () => {
-        const { draftShapes, markDraftSaved } = useDraftStore.getState();
+        // 校验仍在同一张图：切图后 loadDraft 会重置 draftShapes/isDirty，旧图编辑不应写错图
         const img = useImageStore.getState().currentImage;
-        if (!img) return;
+        if (!img || img.id !== imageId) return;
+        const { draftShapes, markDraftSaved } = useDraftStore.getState();
         try {
-          await saveDraft(img.id, draftShapes);
+          await saveDraft(imageId, draftShapes);
           markDraftSaved();
         } catch {
           // 保持 isDirty，下次编辑时重试
