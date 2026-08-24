@@ -50,8 +50,13 @@ def accept_draft(image_id: int, body: DraftAcceptRequest, db: Session = Depends(
     existing = read_annotation(work_dir, batch.name, img.file_name)
     shapes = list(existing.get("shapes", [])) if existing else []
     label_status = dict(existing.get("labelStatus", {})) if existing else {}
-    for s in draft.get("shapes", []):
-        shapes.append(s)
+
+    # 覆盖：接受预分割的标签，替换掉该标签已有的手工 shapes，避免叠加；其它标签不动
+    draft_shapes = draft.get("shapes", [])
+    draft_labels = {s["label"] for s in draft_shapes}
+    shapes = [s for s in shapes if s.get("label") not in draft_labels]
+    shapes.extend(draft_shapes)
+    for s in draft_shapes:
         label_status[s["label"]] = "present"
 
     saved = write_annotation(
