@@ -90,3 +90,13 @@ def test_smooth_ring_rounds_corners():
     assert [0.0, 0.0] not in smoothed  # 角被切掉
     for x, y in smoothed:
         assert 0.0 <= x <= 10.0 and 0.0 <= y <= 10.0
+
+
+def test_smooth_and_simplify_reduces_points():
+    from app.services.onnx_service import _smooth_ring, _smooth_and_simplify
+    square = [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]]
+    smoothed = _smooth_ring(square, iterations=2)
+    combined = _smooth_and_simplify(square)
+    assert len(combined) <= len(smoothed)  # 简化后点数不增
+    assert len(combined) >= 3
+    assert [0.0, 0.0] not in combined      # 角仍被切掉（平滑）

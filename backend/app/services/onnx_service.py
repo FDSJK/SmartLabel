@@ -103,6 +103,23 @@ def _smooth_ring(pts: list[list[float]], iterations: int = 2) -> list[list[float
     return pts
 
 
+def _simplify_ring(pts: list[list[float]], epsilon: float) -> list[list[float]]:
+    """Douglas-Peucker 简化，去掉平滑后产生的冗余点。"""
+    if len(pts) < 4:
+        return pts
+    arr = np.array(pts, dtype=np.float32).reshape(-1, 1, 2)
+    approx = cv2.approxPolyDP(arr, epsilon, True)
+    out = [[float(p[0][0]), float(p[0][1])] for p in approx]
+    return out if len(out) >= 3 else pts
+
+
+def _smooth_and_simplify(pts: list[list[float]]) -> list[list[float]]:
+    """先 Chaikin 平滑锯齿，再 Douglas-Peucker 简化，得到平滑且点数适中的环。"""
+    smoothed = _smooth_ring(pts, iterations=2)
+    peri = cv2.arcLength(np.array(smoothed, dtype=np.float32).reshape(-1, 1, 2), True)
+    return _simplify_ring(smoothed, max(1.0, 0.005 * peri))
+
+
 def run_inference(cfg: ModelConfig, image_path: str) -> list[dict]:
     tensor, orig_w, orig_h = preprocess(image_path, cfg)
     with _infer_lock:  # CPU 串行化
@@ -120,7 +137,7 @@ def run_inference(cfg: ModelConfig, image_path: str) -> list[dict]:
                 "id": str(uuid.uuid4()),
                 "label": label,
                 "shapeType": "polygon",
-                "points": _smooth_ring(poly["points"]),
-                "holes": [_smooth_ring(h) for h in poly["holes"]],
+                "points": _smooth_and_simplify(poly["points"]),
+                "holes": [_smooth_and_simplify(h) for h in poly["holes"]],
             })
     return shapes
