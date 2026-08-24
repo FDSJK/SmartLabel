@@ -6,4 +6,5 @@
 .item:focus-visible { outline: none; }
 .status { font-size: 14px; flex-shrink: 0; }
 .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inferBadge { font-size: 11px; flex-shrink: 0; white-space: nowrap; }
 .lock { flex-shrink: 0; font-size: 12px; }

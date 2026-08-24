@@ -4,6 +4,7 @@ import { triggerInference, triggerBatchInference, getJob } from '../../api/infer
 import { useImageStore } from '../../stores/imageStore';
 import { useBatchStore } from '../../stores/batchStore';
 import { useDraftStore } from '../../stores/draftStore';
+import { useInferenceStore } from '../../stores/inferenceStore';
 import type { ModelConfig, InferenceJob } from '../../types/model';
 import styles from './InferencePanel.module.css';
 
@@ -14,6 +15,7 @@ export default function InferencePanel() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const batchPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentImage = useImageStore((s) => s.currentImage);
   const currentBatchId = useBatchStore((s) => s.currentBatchId);
@@ -25,13 +27,17 @@ export default function InferencePanel() {
     listModels().then((m) => setModels(m.filter((x) => x.enabled))).catch(() => {});
   }, []);
 
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+  useEffect(() => () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (batchPollRef.current) clearInterval(batchPollRef.current);
+  }, []);
 
   const startPolling = (jobId: number, imageId: number) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       const j = await getJob(jobId);
       setJob(j);
+      useInferenceStore.getState().setJob(j);
       if (j.status === 'done' || j.status === 'failed') {
         if (pollRef.current) clearInterval(pollRef.current);
         setBusy(false);
@@ -40,6 +46,16 @@ export default function InferencePanel() {
         }
       }
     }, 1500);
+  };
+
+  const startBatchPolling = (batchId: number) => {
+    if (batchPollRef.current) clearInterval(batchPollRef.current);
+    const tick = async () => {
+      const pending = await useInferenceStore.getState().loadBatchJobs(batchId);
+      if (!pending && batchPollRef.current) clearInterval(batchPollRef.current);
+    };
+    tick();
+    batchPollRef.current = setInterval(tick, 3000);
   };
 
   const runSingle = async () => {
@@ -61,6 +77,7 @@ export default function InferencePanel() {
       const r = await triggerBatchInference(modelId, currentBatchId);
       setBusy(false);
       setNotice(`已排队 ${r.queued} 张，后台推理中`);
+      startBatchPolling(currentBatchId);
     } catch (e) {
       setBusy(false);
       setNotice(`触发失败：${(e as Error).message}`);
