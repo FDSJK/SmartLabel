@@ -92,6 +92,7 @@ export default function AnnotationPage() {
       } else {
         store.selectShape(null);
       }
+      useDraftStore.getState().selectDraft(null);
       store.setTool('polygon');
       return;
     }

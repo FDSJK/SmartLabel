@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
+import { useDraftStore } from '../../stores/draftStore';
 import { useLabelStore } from '../../stores/labelStore';
 import LabelStatusList from './LabelStatusList';
 import type { EditorTool } from '../../types/shapes';
@@ -46,6 +47,7 @@ export default function RightPanel() {
     // Switch to edit mode and select the shape
     if (currentTool !== 'select') setTool('select');
     selectShape(selectedShapeId === shapeId ? null : shapeId);
+    useDraftStore.getState().selectDraft(null);
   }
 
   function handleDelete(shapeId: string, e: React.MouseEvent) {
@@ -53,6 +55,7 @@ export default function RightPanel() {
     // Select then delete
     if (selectedShapeId !== shapeId) {
       selectShape(shapeId);
+      useDraftStore.getState().selectDraft(null);
     }
     // Use setTimeout to allow the select to take effect first
     setTimeout(() => {
