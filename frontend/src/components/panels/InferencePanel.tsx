@@ -5,6 +5,7 @@ import { useImageStore } from '../../stores/imageStore';
 import { useBatchStore } from '../../stores/batchStore';
 import { useDraftStore } from '../../stores/draftStore';
 import type { ModelConfig, InferenceJob } from '../../types/model';
+import styles from './InferencePanel.module.css';
 
 export default function InferencePanel() {
   const [models, setModels] = useState<ModelConfig[]>([]);
@@ -21,7 +22,7 @@ export default function InferencePanel() {
   const draftMeta = useDraftStore((s) => s.draftMeta);
 
   useEffect(() => {
-    listModels().then((m) => setModels(m.filter((x) => x.enabled)));
+    listModels().then((m) => setModels(m.filter((x) => x.enabled))).catch(() => {});
   }, []);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
@@ -71,25 +72,30 @@ export default function InferencePanel() {
     : '';
 
   return (
-    <div>
-      <h3>预分割</h3>
-      <select value={modelId ?? ''} onChange={(e) => setModelId(Number(e.target.value) || null)}>
+    <div className={styles.section}>
+      <h3 className={styles.title}>预分割</h3>
+      <select className={styles.select} value={modelId ?? ''} onChange={(e) => setModelId(Number(e.target.value) || null)}>
         <option value="">选择模型</option>
         {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
       </select>
-      <button onClick={runSingle} disabled={!modelId || !currentImage || busy}>推理此图</button>
-      <button onClick={runBatch} disabled={!modelId || !currentBatchId || busy}>推理整批</button>
-      {statusText && <p>{statusText}</p>}
-      {notice && <p>{notice}</p>}
+      <div className={styles.btnRow}>
+        <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={runSingle} disabled={!modelId || !currentImage || busy}>推理此图</button>
+        <button className={styles.btn} onClick={runBatch} disabled={!modelId || !currentBatchId || busy}>推理整批</button>
+      </div>
+      {statusText && <p className={styles.status}>{statusText}</p>}
+      {notice && <p className={styles.status}>{notice}</p>}
+      {job?.status === 'failed' && <button className={styles.btn} onClick={runSingle}>重试</button>}
+
       {draftStatus === 'ready' && currentImage && (
-        <div>
-          <p>草稿：{draftMeta?.modelName ?? '模型预分割'}</p>
-          <button onClick={() => useDraftStore.getState().acceptDraft(currentImage.id)} disabled={!lockedByMe}>接受</button>
-          <button onClick={() => useDraftStore.getState().rejectDraft(currentImage.id)} disabled={!lockedByMe}>拒绝</button>
-          {!lockedByMe && <p>只读模式，无法接受/拒绝</p>}
+        <div className={styles.draftBox}>
+          <p className={styles.draftLabel}>草稿：{draftMeta?.modelName ?? '模型预分割'}</p>
+          <div className={styles.btnRow}>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => useDraftStore.getState().acceptDraft(currentImage.id)} disabled={!lockedByMe}>接受</button>
+            <button className={styles.btn} onClick={() => useDraftStore.getState().rejectDraft(currentImage.id)} disabled={!lockedByMe}>拒绝</button>
+          </div>
+          {!lockedByMe && <p className={styles.status}>只读模式，无法接受/拒绝</p>}
         </div>
       )}
-      {job?.status === 'failed' && <button onClick={runSingle}>重试</button>}
     </div>
   );
 }

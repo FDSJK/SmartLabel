@@ -1,5 +1,6 @@
 import { useLabelStore } from '../../stores/labelStore';
 import { useEditorStore } from '../../stores/editorStore';
+import { useUIStore } from '../../stores/uiStore';
 import type { LabelStatusValue } from '../../types/shapes';
 import styles from './LabelStatusList.module.css';
 
@@ -9,12 +10,25 @@ const STATUS_OPTIONS: { value: LabelStatusValue; label: string; className: strin
   { value: 'pending', label: '○ 待定', className: 'pending' },
 ];
 
+function EyeIcon({ off }: { off: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+      {off && <line x1="1" y1="1" x2="23" y2="23" />}
+    </svg>
+  );
+}
+
 export default function LabelStatusList() {
   const labels = useLabelStore(s => s.labels);
   const selectedLabel = useEditorStore(s => s.selectedLabel);
   const labelStatus = useEditorStore(s => s.labelStatus);
   const setSelectedLabel = useEditorStore(s => s.setSelectedLabel);
   const cycleLabelStatus = useEditorStore(s => s.cycleLabelStatus);
+  const hiddenLabels = useUIStore(s => s.hiddenLabels);
+  const toggleLabelVisibility = useUIStore(s => s.toggleLabelVisibility);
 
   const enabledLabels = labels.filter(l => l.enabled);
 
@@ -28,12 +42,22 @@ export default function LabelStatusList() {
         {enabledLabels.map(label => {
           const status = labelStatus[label.name] || 'pending';
           const isSelected = selectedLabel === label.name;
+          const hidden = !!hiddenLabels[label.name];
 
           return (
             <div
               key={label.id}
               className={`${styles.item} ${isSelected ? styles.itemSelected : ''}`}
             >
+              {/* Eye toggle — 显示/隐藏该标签的标注 */}
+              <button
+                className={styles.eye}
+                onClick={() => toggleLabelVisibility(label.name)}
+                title={hidden ? '显示此标签' : '隐藏此标签'}
+              >
+                <EyeIcon off={hidden} />
+              </button>
+
               {/* Color swatch — click to select as active label */}
               <button
                 className={styles.swatch}

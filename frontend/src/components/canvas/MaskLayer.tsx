@@ -20,6 +20,7 @@ export default function MaskLayer() {
   const shapes = useEditorStore(s => s.shapes);
   const showMask = useUIStore(s => s.showMask);
   const showFill = useUIStore(s => s.showFill);
+  const hiddenLabels = useUIStore(s => s.hiddenLabels);
   const labels = useLabelStore(s => s.labels);
 
   // Build a label-name → color lookup
@@ -32,7 +33,7 @@ export default function MaskLayer() {
 
   return (
     <>
-      {shapes.map(shape => {
+      {shapes.filter(shape => !hiddenLabels[shape.label]).map(shape => {
         const fillColor = colorMap.get(shape.label) || '#888888';
 
         return (
