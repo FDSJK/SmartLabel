@@ -39,27 +39,25 @@ def preprocess(image_path: str, cfg: ModelConfig) -> tuple[np.ndarray, int, int]
 
 
 def postprocess(logits: np.ndarray, cfg: ModelConfig, orig_w: int, orig_h: int) -> dict[str, np.ndarray]:
-    """logits (1,C,H',W') → {label: 原图分辨率二值 mask(0/255)}。背景通道自然排除（不匹配任何 label channel）。"""
-    logits = logits[0]  # (C, H', W')
+    """logits (1,C,H',W') → {label: 原图分辨率二值 mask(0/255)}。
 
+    先把 logits 双线性上采样到原图尺寸再做 argmax/阈值，避免最近邻放大产生的锯齿边界。
+    背景通道自然排除（不匹配任何 label channel）。
+    """
+    logits = logits[0]  # (C, H', W')
+    hwc = logits.transpose(1, 2, 0)  # (H', W', C)
+    up = cv2.resize(hwc, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)  # (H, W, C)
+
+    masks: dict[str, np.ndarray] = {}
     if cfg.postprocess == "argmax":
-        class_map = logits.argmax(axis=0).astype(np.uint8)
-        class_map = cv2.resize(class_map, (cfg.input_width, cfg.input_height),
-                               interpolation=cv2.INTER_NEAREST)
-        masks: dict[str, np.ndarray] = {}
+        class_map = up.argmax(axis=2).astype(np.uint8)  # (H, W)
         for cat in cfg.categories:
             masks[cat["label"]] = ((class_map == int(cat["channel"])) * 255).astype(np.uint8)
     else:  # sigmoid
-        prob = 1.0 / (1.0 + np.exp(-logits))  # (C, H', W')
-        masks = {}
+        prob = 1.0 / (1.0 + np.exp(-up))  # (H, W, C)
         for cat in cfg.categories:
-            p = cv2.resize(prob[int(cat["channel"])], (cfg.input_width, cfg.input_height),
-                           interpolation=cv2.INTER_LINEAR)
-            masks[cat["label"]] = ((p > cfg.sigmoid_threshold) * 255).astype(np.uint8)
-
-    # 逆 resize 回原图分辨率（stretch：直接最近邻缩放）
-    return {label: cv2.resize(m, (orig_w, orig_h), interpolation=cv2.INTER_NEAREST)
-            for label, m in masks.items()}
+            masks[cat["label"]] = ((prob[..., int(cat["channel"])] > cfg.sigmoid_threshold) * 255).astype(np.uint8)
+    return masks
 
 
 _sessions: dict[int, ort.InferenceSession] = {}
@@ -89,6 +87,22 @@ def invalidate_session(cfg_id: int) -> None:
         _sessions.pop(cfg_id, None)
 
 
+def _smooth_ring(pts: list[list[float]], iterations: int = 2) -> list[list[float]]:
+    """Chaikin 角切法平滑环，减少像素级锯齿。"""
+    for _ in range(iterations):
+        n = len(pts)
+        if n < 3:
+            break
+        smoothed: list[list[float]] = []
+        for i in range(n):
+            p0 = pts[i]
+            p1 = pts[(i + 1) % n]
+            smoothed.append([0.75 * p0[0] + 0.25 * p1[0], 0.75 * p0[1] + 0.25 * p1[1]])
+            smoothed.append([0.25 * p0[0] + 0.75 * p1[0], 0.25 * p0[1] + 0.75 * p1[1]])
+        pts = smoothed
+    return pts
+
+
 def run_inference(cfg: ModelConfig, image_path: str) -> list[dict]:
     tensor, orig_w, orig_h = preprocess(image_path, cfg)
     with _infer_lock:  # CPU 串行化
@@ -106,7 +120,7 @@ def run_inference(cfg: ModelConfig, image_path: str) -> list[dict]:
                 "id": str(uuid.uuid4()),
                 "label": label,
                 "shapeType": "polygon",
-                "points": poly["points"],
-                "holes": poly["holes"],
+                "points": _smooth_ring(poly["points"]),
+                "holes": [_smooth_ring(h) for h in poly["holes"]],
             })
     return shapes

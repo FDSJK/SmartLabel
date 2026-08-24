@@ -80,3 +80,13 @@ def test_resolve_model_path(monkeypatch, tmp_path):
     monkeypatch.setattr("app.core.config.settings.MODELS_DIR", str(tmp_path))
     assert _resolve_model_path(_cfg(source="upload", model_path="m.onnx")) == os.path.join(str(tmp_path), "m.onnx")
     assert _resolve_model_path(_cfg(source="path", model_path="/abs/m.onnx")) == "/abs/m.onnx"
+
+
+def test_smooth_ring_rounds_corners():
+    from app.services.onnx_service import _smooth_ring
+    square = [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]]
+    smoothed = _smooth_ring(square, iterations=2)
+    assert len(smoothed) > len(square)
+    assert [0.0, 0.0] not in smoothed  # 角被切掉
+    for x, y in smoothed:
+        assert 0.0 <= x <= 10.0 and 0.0 <= y <= 10.0
