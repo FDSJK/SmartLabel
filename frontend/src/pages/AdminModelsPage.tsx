@@ -9,6 +9,14 @@ const EMPTY: ModelConfigInput = {
   background_channel: 0, categories: [], postprocess: 'argmax', sigmoid_threshold: 0.5, enabled: true,
 };
 
+function parseFloatList(s: string): number[] | null {
+  const parts = s.split(',').map((x) => x.trim()).filter((x) => x !== '');
+  if (parts.length === 0) return null;
+  const nums = parts.map(Number);
+  if (nums.some((n) => Number.isNaN(n))) return null;
+  return nums;
+}
+
 export default function AdminModelsPage() {
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [form, setForm] = useState<ModelConfigInput>(EMPTY);
@@ -16,9 +24,10 @@ export default function AdminModelsPage() {
   const [message, setMessage] = useState('');
   const fileRef = useRef<File | null>(null);
   const labels = useLabelStore((s) => s.labels);
+  const loadLabels = useLabelStore((s) => s.load);
 
   const refresh = () => listModels().then(setModels).catch(() => {});
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); loadLabels(); }, [loadLabels]);
 
   const set = <K extends keyof ModelConfigInput>(k: K, v: ModelConfigInput[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -44,6 +53,7 @@ export default function AdminModelsPage() {
 
   function edit(m: ModelConfig) {
     setEditingId(m.id);
+    fileRef.current = null;
     setForm({
       name: m.name, source: m.source, model_path: m.model_path,
       input_width: m.input_width, input_height: m.input_height,
@@ -110,8 +120,8 @@ export default function AdminModelsPage() {
         </label>
         {form.normalize_mode === 'mean_std' && (
           <>
-            <label>mean <input value={(form.mean ?? []).join(',')} onChange={(e) => set('mean', e.target.value.split(',').map(Number))} /></label>
-            <label>std <input value={(form.std ?? []).join(',')} onChange={(e) => set('std', e.target.value.split(',').map(Number))} /></label>
+            <label>mean <input value={(form.mean ?? []).join(',')} onChange={(e) => set('mean', parseFloatList(e.target.value))} /></label>
+            <label>std <input value={(form.std ?? []).join(',')} onChange={(e) => set('std', parseFloatList(e.target.value))} /></label>
           </>
         )}
         <label>背景通道 <input type="number" value={form.background_channel} onChange={(e) => set('background_channel', Number(e.target.value))} /></label>
