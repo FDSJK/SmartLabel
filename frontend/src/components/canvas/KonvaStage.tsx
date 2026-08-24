@@ -6,6 +6,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { useImageStore } from '../../stores/imageStore';
 import ImageLayer from './ImageLayer';
 import MaskLayer from './MaskLayer';
+import DraftLayer from './DraftLayer';
 import DrawingLayer from './DrawingLayer';
 import styles from './KonvaStage.module.css';
 
@@ -122,6 +123,9 @@ export default function KonvaStage() {
         </Layer>
         <Layer>
           <MaskLayer />
+        </Layer>
+        <Layer>
+          <DraftLayer />
         </Layer>
         <Layer>
           <DrawingLayer />

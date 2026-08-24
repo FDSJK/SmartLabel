@@ -5,6 +5,7 @@ import { fetchImage } from '../api/images';
 import { acquireLock, releaseLock, sendHeartbeat } from '../api/locks';
 import { fetchAnnotation } from '../api/annotations';
 import { useEditorStore } from './editorStore';
+import { useDraftStore } from './draftStore';
 import { useUIStore } from './uiStore';
 import { useBatchStore } from './batchStore';
 
@@ -51,6 +52,7 @@ export const useImageStore = create<ImageState>((set, get) => ({
           annotation.labelStatus as Record<string, LabelStatusValue>,
           annotation.version,
         );
+        useDraftStore.getState().loadDraft(imageId);
         set({
           currentImage: { ...img, locked_by_username: lockResult.locked_by_username },
           loading: false,
@@ -70,6 +72,8 @@ export const useImageStore = create<ImageState>((set, get) => ({
         annotation.labelStatus as Record<string, LabelStatusValue>,
         annotation.version,
       );
+
+      useDraftStore.getState().loadDraft(imageId);
 
       // Fit image to screen
       const { fitToScreen } = useUIStore.getState();
@@ -130,6 +134,7 @@ export const useImageStore = create<ImageState>((set, get) => ({
   clearImage: () => {
     get().stopHeartbeat();
     useEditorStore.getState().reset();
+    useDraftStore.getState().clear();
     set({ currentImage: null, loading: false, lockedByMe: false });
   },
 

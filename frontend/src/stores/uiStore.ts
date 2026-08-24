@@ -6,6 +6,7 @@ interface UIState {
   offsetX: number;
   offsetY: number;
   showMask: boolean;
+  // 草稿层显隐
   showDraft: boolean;
   showFill: boolean;
   saveStatus: SaveStatus;
