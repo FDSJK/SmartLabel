@@ -9,9 +9,15 @@ interface InferenceState {
   loadBatchJobs: (batchId: number) => Promise<boolean>;
   setJob: (job: InferenceJob) => void;
   clear: () => void;
+  /** 开始轮询某批次（幂等），直到没有排队/运行中的任务为止；不随组件卸载而停止 */
+  startPolling: (batchId: number) => void;
+  stopPolling: () => void;
 }
 
-export const useInferenceStore = create<InferenceState>((set) => ({
+// 模块级定时器：轮询不依赖任何组件生命周期
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+export const useInferenceStore = create<InferenceState>((set, get) => ({
   jobsByImage: {},
 
   loadBatchJobs: async (batchId) => {
@@ -27,4 +33,22 @@ export const useInferenceStore = create<InferenceState>((set) => ({
   setJob: (job) => set((s) => ({ jobsByImage: { ...s.jobsByImage, [job.image_id]: job } })),
 
   clear: () => set({ jobsByImage: {} }),
+
+  startPolling: (batchId) => {
+    if (pollTimer) clearInterval(pollTimer);
+    const tick = async () => {
+      const pending = await get().loadBatchJobs(batchId);
+      if (!pending && pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    };
+    tick();
+    pollTimer = setInterval(tick, 3000);
+  },
+
+  stopPolling: () => {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+  },
 }));

@@ -29,11 +29,15 @@ export default function ImageList() {
   const currentImageId = useImageStore(s => s.currentImage?.id);
   const jobsByImage = useInferenceStore(s => s.jobsByImage);
 
-  // 切换批次时加载该批次的推理任务状态（仅初始加载；触发推理后由 InferencePanel 轮询更新）
+  // 切换批次时加载该批次的推理任务状态，并在有排队/运行中任务时轮询更新
   useEffect(() => {
     const store = useInferenceStore.getState();
-    store.clear();
-    if (currentBatchId) store.loadBatchJobs(currentBatchId);
+    if (currentBatchId) {
+      store.startPolling(currentBatchId);
+    } else {
+      store.clear();
+      store.stopPolling();
+    }
   }, [currentBatchId]);
 
   if (!currentBatchId) {

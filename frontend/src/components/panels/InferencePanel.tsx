@@ -15,7 +15,6 @@ export default function InferencePanel() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const batchPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentImage = useImageStore((s) => s.currentImage);
@@ -30,7 +29,6 @@ export default function InferencePanel() {
 
   useEffect(() => () => {
     if (pollRef.current) clearInterval(pollRef.current);
-    if (batchPollRef.current) clearInterval(batchPollRef.current);
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
   }, []);
 
@@ -63,16 +61,6 @@ export default function InferencePanel() {
     }, 1500);
   };
 
-  const startBatchPolling = (batchId: number) => {
-    if (batchPollRef.current) clearInterval(batchPollRef.current);
-    const tick = async () => {
-      const pending = await useInferenceStore.getState().loadBatchJobs(batchId);
-      if (!pending && batchPollRef.current) clearInterval(batchPollRef.current);
-    };
-    tick();
-    batchPollRef.current = setInterval(tick, 3000);
-  };
-
   const runSingle = async () => {
     if (!modelId || !currentImage) return;
     setBusy(true); setJob(null); setNotice('');
@@ -92,7 +80,7 @@ export default function InferencePanel() {
       const r = await triggerBatchInference(modelId, currentBatchId);
       setBusy(false);
       flashNotice(`已排队 ${r.queued} 张，后台推理中`);
-      startBatchPolling(currentBatchId);
+      useInferenceStore.getState().startPolling(currentBatchId);
     } catch (e) {
       setBusy(false);
       flashNotice(`触发失败：${(e as Error).message}`);
