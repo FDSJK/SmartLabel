@@ -1,9 +1,11 @@
+import os
 import threading
 import uuid
 import cv2
 import numpy as np
 from PIL import Image as PILImage
 import onnxruntime as ort
+import app.core.config as _config
 
 from app.models.model_config import ModelConfig
 from app.services.mask_import import vectorize_array
@@ -65,13 +67,20 @@ _session_lock = threading.Lock()
 _infer_lock = threading.Lock()
 
 
+def _resolve_model_path(cfg: ModelConfig) -> str:
+    """source=upload 时 model_path 是文件名，拼上 MODELS_DIR；source=path 时已是完整路径。"""
+    if cfg.source == "upload":
+        return os.path.join(_config.settings.MODELS_DIR, cfg.model_path)
+    return cfg.model_path
+
+
 def _get_session(cfg: ModelConfig) -> ort.InferenceSession:
     with _session_lock:
         if cfg.id not in _sessions:
             avail = ort.get_available_providers()
             providers = (["CUDAExecutionProvider", "CPUExecutionProvider"]
                          if "CUDAExecutionProvider" in avail else ["CPUExecutionProvider"])
-            _sessions[cfg.id] = ort.InferenceSession(cfg.model_path, providers=providers)
+            _sessions[cfg.id] = ort.InferenceSession(_resolve_model_path(cfg), providers=providers)
         return _sessions[cfg.id]
 
 

@@ -72,3 +72,11 @@ def test_run_inference_pipeline(monkeypatch, tmp_path):
     assert len(shapes) == 1
     assert shapes[0]["label"] == "cat"
     assert len(shapes[0]["points"]) >= 3
+
+
+def test_resolve_model_path(monkeypatch, tmp_path):
+    import os
+    from app.services.onnx_service import _resolve_model_path
+    monkeypatch.setattr("app.core.config.settings.MODELS_DIR", str(tmp_path))
+    assert _resolve_model_path(_cfg(source="upload", model_path="m.onnx")) == os.path.join(str(tmp_path), "m.onnx")
+    assert _resolve_model_path(_cfg(source="path", model_path="/abs/m.onnx")) == "/abs/m.onnx"
