@@ -94,6 +94,16 @@ class ApiClient {
     if (!res.ok) return this._raise(res);
     return res.json();
   }
+
+  async uploadFile<T>(path: string, file: File, field = 'file'): Promise<T> {
+    const formData = new FormData();
+    formData.append(field, file);
+    const h: Record<string, string> = {};
+    if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+    const res = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers: h, body: formData });
+    if (!res.ok) return this._raise(res);
+    return res.json();
+  }
 }
 
 export const apiClient = new ApiClient();
