@@ -108,7 +108,6 @@ export default function AdminModelsPage() {
         <label>resize
           <select value={form.resize_mode} onChange={(e) => set('resize_mode', e.target.value as ModelConfigInput['resize_mode'])}>
             <option value="stretch">stretch</option>
-            <option value="letterbox">letterbox</option>
           </select>
         </label>
         <label>归一化

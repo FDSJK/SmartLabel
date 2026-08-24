@@ -42,7 +42,7 @@ def _run_job(job_id: int) -> None:
             "imageName": img.file_name,
             "modelConfigId": cfg.id,
             "modelName": cfg.name,
-            "createdAt": datetime.now(timezone.utc).isoformat() + "Z",
+            "createdAt": datetime.now(timezone.utc).isoformat(),
             "shapes": shapes,
         })
         job.status = "done"

@@ -16,6 +16,9 @@ export default function InferencePanel() {
 
   const currentImage = useImageStore((s) => s.currentImage);
   const currentBatchId = useBatchStore((s) => s.currentBatchId);
+  const lockedByMe = useImageStore((s) => s.lockedByMe);
+  const draftStatus = useDraftStore((s) => s.status);
+  const draftMeta = useDraftStore((s) => s.draftMeta);
 
   useEffect(() => {
     listModels().then((m) => setModels(m.filter((x) => x.enabled)));
@@ -78,6 +81,14 @@ export default function InferencePanel() {
       <button onClick={runBatch} disabled={!modelId || !currentBatchId || busy}>推理整批</button>
       {statusText && <p>{statusText}</p>}
       {notice && <p>{notice}</p>}
+      {draftStatus === 'ready' && currentImage && (
+        <div>
+          <p>草稿：{draftMeta?.modelName ?? '模型预分割'}</p>
+          <button onClick={() => useDraftStore.getState().acceptDraft(currentImage.id)} disabled={!lockedByMe}>接受</button>
+          <button onClick={() => useDraftStore.getState().rejectDraft(currentImage.id)} disabled={!lockedByMe}>拒绝</button>
+          {!lockedByMe && <p>只读模式，无法接受/拒绝</p>}
+        </div>
+      )}
       {job?.status === 'failed' && <button onClick={runSingle}>重试</button>}
     </div>
   );

@@ -23,6 +23,7 @@ interface DraftState {
   selectedDraftId: string | null;
   isDirty: boolean;
   status: 'none' | 'loading' | 'ready';
+  _loadingImageId: number | null;
 
   loadDraft: (imageId: number) => Promise<void>;
   selectDraft: (id: string | null) => void;
@@ -41,11 +42,13 @@ export const useDraftStore = create<DraftState>((set, get) => ({
   selectedDraftId: null,
   isDirty: false,
   status: 'none',
+  _loadingImageId: null,
 
   loadDraft: async (imageId) => {
-    set({ status: 'loading' });
+    set({ status: 'loading', _loadingImageId: imageId });
     try {
       const d = await fetchDraft(imageId);
+      if (get()._loadingImageId !== imageId) return;  // 切图了，丢弃过期结果
       set({
         draftShapes: d.shapes.map(cloneShape),
         draftMeta: { modelConfigId: d.modelConfigId, modelName: d.modelName, createdAt: d.createdAt },
@@ -54,6 +57,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
         isDirty: false,
       });
     } catch {
+      if (get()._loadingImageId !== imageId) return;
       set({ draftShapes: [], draftMeta: null, status: 'none', selectedDraftId: null, isDirty: false });
     }
   },
@@ -106,5 +110,5 @@ export const useDraftStore = create<DraftState>((set, get) => ({
   },
 
   markDraftSaved: () => set({ isDirty: false }),
-  clear: () => set({ draftShapes: [], draftMeta: null, selectedDraftId: null, isDirty: false, status: 'none' }),
+  clear: () => set({ draftShapes: [], draftMeta: null, selectedDraftId: null, isDirty: false, status: 'none', _loadingImageId: null }),
 }));
