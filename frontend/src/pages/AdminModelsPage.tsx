@@ -39,13 +39,13 @@ export default function AdminModelsPage() {
   async function onSubmit() {
     setError('');
     let path = form.model_path;
-    if (form.source === 'upload' && fileRef.current?.files?.[0]) {
-      const r = await uploadModel(fileRef.current.files[0]);
-      path = r.filename;
-    }
-    if (!path) { setError('请填写模型路径或选择文件'); return; }
-    const body = { ...form, model_path: path };
     try {
+      if (form.source === 'upload' && fileRef.current?.files?.[0]) {
+        const r = await uploadModel(fileRef.current.files[0]);
+        path = r.filename;
+      }
+      if (!path) { setError('请填写模型路径或选择文件'); return; }
+      const body = { ...form, model_path: path };
       if (editingId) await updateModel(editingId, body);
       else await createModel(body);
       resetForm();
@@ -89,7 +89,12 @@ export default function AdminModelsPage() {
   return (
     <div className={styles.page}>
       <h2 className={styles.heading}>模型配置</h2>
-      {error && <div className={styles.error}>{error}</div>}
+      {error && (
+        <div className={styles.error}>
+          <span>{error}</span>
+          <button className={styles.errorClose} onClick={() => setError('')} title="关闭">×</button>
+        </div>
+      )}
 
       <h3 className={styles.sectionTitle}>模型列表</h3>
       <table className={styles.table}>
