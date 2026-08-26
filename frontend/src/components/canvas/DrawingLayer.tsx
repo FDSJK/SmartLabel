@@ -408,19 +408,6 @@ export default function DrawingLayer() {
     [isSelecting, isAdding, isCutting],
   );
 
-  const handleContextMenu = useCallback(
-    (e: KonvaEventObject<PointerEvent>) => {
-      if (!drawingActive) return;
-      e.evt.preventDefault();
-      const store = useEditorStore.getState();
-      const pts = store.drawingPoints;
-      if (!pts || pts.length < 3) { store.cancelDrawing(); return; }
-      store.finishDrawing();
-      setCursorPos(null);
-    },
-    [drawingActive],
-  );
-
   const handleMouseLeave = useCallback(() => {
     isPanning.current = false;
     freehandActive.current = false;
@@ -475,7 +462,6 @@ export default function DrawingLayer() {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
-          onContextMenu={handleContextMenu}
           onDblClick={handleDblClick}
         />
       )}

@@ -1,9 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Stage, Layer } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type Konva from 'konva';
 import { useUIStore } from '../../stores/uiStore';
 import { useImageStore } from '../../stores/imageStore';
+import { useEditorStore } from '../../stores/editorStore';
 import ImageLayer from './ImageLayer';
 import MaskLayer from './MaskLayer';
 import DraftLayer from './DraftLayer';
@@ -94,43 +96,50 @@ export default function KonvaStage() {
     isPanning.current = false;
   }, []);
 
-  if (!currentImage) {
-    return (
-      <div ref={containerRef} className={styles.container}>
-        <div className={styles.placeholder}>选择一张图像开始标注</div>
-      </div>
-    );
-  }
+  // 右键闭合/取消当前绘制。用容器级原生 contextmenu 事件，
+  // 不依赖 Konva 节点的命中检测，跨平台（Windows/macOS）更可靠。
+  const handleContextMenu = useCallback((e: ReactMouseEvent) => {
+    e.preventDefault();
+    const { currentTool, drawingPoints } = useEditorStore.getState();
+    if (currentTool !== 'polygon' && currentTool !== 'freehand') return;
+    if (drawingPoints === null) return;
+    if (drawingPoints.length >= 3) useEditorStore.getState().finishDrawing();
+    else useEditorStore.getState().cancelDrawing();
+  }, []);
 
   return (
-    <div ref={containerRef} className={styles.container}>
-      <Stage
-        ref={stageRef}
-        width={size.width}
-        height={size.height}
-        scaleX={zoom}
-        scaleY={zoom}
-        x={offsetX}
-        y={offsetY}
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
-        <Layer>
-          <ImageLayer />
-        </Layer>
-        <Layer>
-          <MaskLayer />
-        </Layer>
-        <Layer>
-          <DraftLayer />
-        </Layer>
-        <Layer>
-          <DrawingLayer />
-        </Layer>
-      </Stage>
+    <div ref={containerRef} className={styles.container} onContextMenu={handleContextMenu}>
+      {!currentImage ? (
+        <div className={styles.placeholder}>选择一张图像开始标注</div>
+      ) : (
+        <Stage
+          ref={stageRef}
+          width={size.width}
+          height={size.height}
+          scaleX={zoom}
+          scaleY={zoom}
+          x={offsetX}
+          y={offsetY}
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          <Layer>
+            <ImageLayer />
+          </Layer>
+          <Layer>
+            <MaskLayer />
+          </Layer>
+          <Layer>
+            <DraftLayer />
+          </Layer>
+          <Layer>
+            <DrawingLayer />
+          </Layer>
+        </Stage>
+      )}
     </div>
   );
 }
