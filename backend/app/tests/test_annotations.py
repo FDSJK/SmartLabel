@@ -58,6 +58,18 @@ def _setup_image(client: TestClient, token: str, user_id: int) -> tuple[int, str
     return image.id, "test-annot", "img1.png", 30, 20
 
 
+def _create_labels(names: list[str]) -> None:
+    from app.main import app
+    from app.core.db import get_db
+    from app.models.label import Label
+
+    db = next(app.dependency_overrides[get_db]())
+    for name in names:
+        db.add(Label(name=name))
+    db.commit()
+    db.close()
+
+
 class TestGetAnnotation:
     def test_get_empty_annotation(self, client: TestClient):
         token, user_id = _admin_token(client)
@@ -125,6 +137,42 @@ class TestSaveAnnotation:
             saved = json.load(f)
         assert saved["version"] == 1
         assert len(saved["shapes"]) == 1
+
+    def test_save_all_labels_resolved_sets_done(self, client: TestClient):
+        token, user_id = _admin_token(client)
+        image_id, _, _, _, _ = _setup_image(client, token, user_id)
+        _create_labels(["cat", "dog"])
+
+        body = {
+            "expectedRev": 0,
+            "shapes": [{"id": "s1", "label": "cat", "shapeType": "polygon", "points": [[1, 1], [2, 1], [1, 2]]}],
+            "labelStatus": {"cat": "present", "dog": "absent"},
+        }
+        resp = client.put(f"/api/images/{image_id}/annotation", json=body, headers=_auth(token))
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "done"
+
+        from app.main import app
+        from app.core.db import get_db
+        from app.models.image import Image
+        db = next(app.dependency_overrides[get_db]())
+        assert db.query(Image).filter(Image.id == image_id).first().status == "done"
+        db.close()
+
+    def test_save_partial_labels_stays_in_progress(self, client: TestClient):
+        token, user_id = _admin_token(client)
+        image_id, _, _, _, _ = _setup_image(client, token, user_id)
+        _create_labels(["cat", "dog"])
+
+        body = {
+            "expectedRev": 0,
+            "shapes": [],
+            # dog 未设置 → 仍为 pending
+            "labelStatus": {"cat": "present"},
+        }
+        resp = client.put(f"/api/images/{image_id}/annotation", json=body, headers=_auth(token))
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "in_progress"
 
     def test_save_read_roundtrip(self, client: TestClient):
         token, user_id = _admin_token(client)

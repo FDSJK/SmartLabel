@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useEditorStore } from '../stores/editorStore';
 import { useImageStore } from '../stores/imageStore';
 import { useUIStore } from '../stores/uiStore';
+import { useBatchStore } from '../stores/batchStore';
 import { saveAnnotation } from '../api/annotations';
 
 const DEBOUNCE_MS = 300;
@@ -48,6 +49,8 @@ export function useAutoSave() {
             editor.labelStatus,
           );
           useEditorStore.getState().markSaved(result.rev);
+          // 保存后用后端返回的图像状态同步列表里的状态圈（完成/进行中）
+          useBatchStore.getState().updateImageStatus(img.id, result.status);
           setSaveStatus('saved');
         } catch (err: unknown) {
           const status = (err as { status?: number }).status;

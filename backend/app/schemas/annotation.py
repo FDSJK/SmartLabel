@@ -21,6 +21,7 @@ class AnnotationResponse(BaseModel):
     shapes: list[ShapeSchema]
     labelStatus: dict[str, str]
     savedAt: str
+    status: str
 
 
 class AnnotationReadResponse(BaseModel):

@@ -87,6 +87,8 @@ export const useImageStore = create<ImageState>((set, get) => ({
 
       // Update lock indicator in batch image list
       useBatchStore.getState().updateImageLock(imageId, lockResult.locked_by_username);
+      // 用后端返回的最新状态同步列表里的状态圈（可能已完成/进行中）
+      useBatchStore.getState().updateImageStatus(imageId, img.status);
 
       // Start heartbeat
       get().startHeartbeat(imageId);

@@ -7,6 +7,7 @@ from app.api.deps import get_current_user, get_owned_image
 from app.services.draft_store import read_draft, write_draft, delete_draft
 from app.services.annotation_store import read_annotation, write_annotation
 from app.services.work_dir import get_work_dir
+from app.services.status import derive_image_status
 
 router = APIRouter()
 
@@ -66,6 +67,7 @@ def accept_draft(image_id: int, body: DraftAcceptRequest, db: Session = Depends(
         username=current_user.username, current_version=img.annotation_rev,
     )
     img.annotation_rev = saved["version"]
+    img.status = derive_image_status(db, label_status)
     db.commit()
     delete_draft(work_dir, batch.name, img.file_name)
     return DraftAcceptResponse(rev=saved["version"], shapes=shapes, labelStatus=label_status)

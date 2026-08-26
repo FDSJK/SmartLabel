@@ -17,6 +17,7 @@ interface BatchState {
   deselectBatch: () => void;
   reset: () => void;
   updateImageLock: (imageId: number, lockedBy: string | null) => void;
+  updateImageStatus: (imageId: number, status: ImageInfo['status']) => void;
 }
 
 export const useBatchStore = create<BatchState>((set, get) => ({
@@ -80,6 +81,14 @@ export const useBatchStore = create<BatchState>((set, get) => ({
     set(s => ({
       images: s.images.map(img =>
         img.id === imageId ? { ...img, locked_by_username: lockedBy } : img,
+      ),
+    }));
+  },
+
+  updateImageStatus: (imageId, status) => {
+    set(s => ({
+      images: s.images.map(img =>
+        img.id === imageId ? { ...img, status } : img,
       ),
     }));
   },

@@ -16,6 +16,7 @@ export interface AnnotationSaveResponse {
   shapes: Shape[];
   labelStatus: Record<string, string>;
   savedAt: string;
+  status: 'pending' | 'in_progress' | 'done';
 }
 
 export async function fetchAnnotation(imageId: number): Promise<AnnotationReadResponse> {

@@ -12,6 +12,7 @@ from app.schemas.annotation import (
 from app.api.deps import get_current_user, get_owned_image
 from app.services.annotation_store import read_annotation, write_annotation
 from app.services.work_dir import get_work_dir
+from app.services.status import derive_image_status
 
 router = APIRouter()
 
@@ -97,8 +98,7 @@ def save_annotation(
 
     # Update DB
     img.annotation_rev = saved["version"]
-    if img.status == "pending":
-        img.status = "in_progress"
+    img.status = derive_image_status(db, body.labelStatus)
     img.updated_at = datetime.utcnow()
     db.commit()
 
@@ -107,4 +107,5 @@ def save_annotation(
         shapes=body.shapes,
         labelStatus=body.labelStatus,
         savedAt=saved["updatedAt"],
+        status=img.status,
     )
