@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useBatchStore } from '../../stores/batchStore';
 import { useImageStore } from '../../stores/imageStore';
 import { useInferenceStore } from '../../stores/inferenceStore';
@@ -28,6 +28,7 @@ export default function ImageList() {
   const loadImage = useImageStore(s => s.loadImage);
   const currentImageId = useImageStore(s => s.currentImage?.id);
   const jobsByImage = useInferenceStore(s => s.jobsByImage);
+  const [query, setQuery] = useState('');
 
   // 切换批次时加载该批次的推理任务状态，并在有排队/运行中任务时轮询更新
   useEffect(() => {
@@ -48,54 +49,72 @@ export default function ImageList() {
     return <div className={styles.empty}>加载中...</div>;
   }
 
-  if (images.length === 0) {
-    return <div className={styles.empty}>暂无图像</div>;
-  }
-
   async function handleClick(imageId: number) {
     await loadImage(imageId);
   }
 
-  return (
-    <div className={styles.list}>
-      {images.map(img => {
-        const job = jobsByImage[img.id];
-        const infer = job ? INFER_STATUS[job.status] : null;
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? images.filter(img => img.file_name.toLowerCase().includes(q))
+    : images;
 
-        return (
-          <div
-            key={img.id}
-            className={`${styles.item} ${currentImageId === img.id ? styles.itemActive : ''}`}
-            onClick={() => handleClick(img.id)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleClick(img.id); }}
-          >
-            <span className={styles.status}
-              title={STATUS_LABELS[img.status] || img.status}
-              style={{
-                color: img.status === 'done' ? 'var(--color-success)'
-                  : img.status === 'in_progress' ? 'var(--color-warning)'
-                  : 'var(--color-text-muted)',
-              }}>
-              {STATUS_ICONS[img.status] || '○'}
-            </span>
-            <span className={styles.name}>{img.file_name}</span>
-            {infer && (
-              <span
-                className={styles.inferBadge}
-                style={{ color: infer.color }}
-                title={job.status === 'failed' ? (job.error || '推理失败') : infer.label}
+  return (
+    <div className={styles.wrapper}>
+      <div className={styles.filterBar}>
+        <input
+          className={styles.filterInput}
+          type="search"
+          placeholder="筛选图像…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+      {images.length === 0 ? (
+        <div className={styles.empty}>暂无图像</div>
+      ) : filtered.length === 0 ? (
+        <div className={styles.empty}>无匹配图像</div>
+      ) : (
+        <div className={styles.list}>
+          {filtered.map(img => {
+            const job = jobsByImage[img.id];
+            const infer = job ? INFER_STATUS[job.status] : null;
+
+            return (
+              <div
+                key={img.id}
+                className={`${styles.item} ${currentImageId === img.id ? styles.itemActive : ''}`}
+                onClick={() => handleClick(img.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleClick(img.id); }}
               >
-                {infer.label}
-              </span>
-            )}
-            {img.locked_by_username && (
-              <span className={styles.lock} title={`被 ${img.locked_by_username} 锁定`}>🔒</span>
-            )}
-          </div>
-        );
-      })}
+                <span className={styles.status}
+                  title={STATUS_LABELS[img.status] || img.status}
+                  style={{
+                    color: img.status === 'done' ? 'var(--color-success)'
+                      : img.status === 'in_progress' ? 'var(--color-warning)'
+                      : 'var(--color-text-muted)',
+                  }}>
+                  {STATUS_ICONS[img.status] || '○'}
+                </span>
+                <span className={styles.name}>{img.file_name}</span>
+                {infer && (
+                  <span
+                    className={styles.inferBadge}
+                    style={{ color: infer.color }}
+                    title={job.status === 'failed' ? (job.error || '推理失败') : infer.label}
+                  >
+                    {infer.label}
+                  </span>
+                )}
+                {img.locked_by_username && (
+                  <span className={styles.lock} title={`被 ${img.locked_by_username} 锁定`}>🔒</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

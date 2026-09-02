@@ -173,6 +173,21 @@ export default function AnnotationPage() {
       return;
     }
 
+    // N — 一键将「待定」标签标记为「不存在」（弹出确认框）
+    if (key === 'n') {
+      const { labels } = useLabelStore.getState();
+      const pending = labels
+        .filter(l => l.enabled && (store.labelStatus[l.name] ?? 'pending') === 'pending')
+        .map(l => l.name);
+      if (pending.length === 0) return;
+      const ok = window.confirm(
+        `确定将 ${pending.length} 个「待定」标签全部标记为「不存在」？\n\n${pending.join('、')}`
+      );
+      if (!ok) return;
+      store.setLabelsAbsent(pending);
+      return;
+    }
+
     // Number keys 1-9: select label by index
     if (e.key >= '1' && e.key <= '9') {
       const { labels } = useLabelStore.getState();

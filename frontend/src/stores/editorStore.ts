@@ -79,6 +79,7 @@ interface EditorState {
   // Actions — Label status
   setLabelStatus: (label: string, status: LabelStatusValue) => void;
   cycleLabelStatus: (label: string) => void;
+  setLabelsAbsent: (labels: string[]) => void;
 
   // Actions — Undo/Redo
   undo: () => void;
@@ -322,6 +323,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const next: LabelStatusValue =
       current === 'pending' ? (hasShapes ? 'present' : 'absent') : 'pending';
     get().setLabelStatus(label, next);
+  },
+
+  setLabelsAbsent: (labels) => {
+    const { shapes, labelStatus } = get();
+    if (labels.length === 0) return;
+    const snapshot = cloneSnapshot(shapes, labelStatus);
+    const updates: Record<string, LabelStatusValue> = {};
+    for (const l of labels) updates[l] = 'absent';
+    set({
+      labelStatus: { ...labelStatus, ...updates },
+      undoStack: [...get().undoStack, snapshot].slice(-MAX_UNDO),
+      redoStack: [],
+      isDirty: true,
+    });
   },
 
   // --- Undo/Redo ---

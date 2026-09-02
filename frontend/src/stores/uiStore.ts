@@ -5,6 +5,12 @@ interface UIState {
   zoom: number;
   offsetX: number;
   offsetY: number;
+  // 已按该图像完成 fit 的图像 id（用于在路由切换回来时保留用户缩放/平移，而不是重新 fit）
+  fittedImageId: number | null;
+  // 原图对比度调整（-100~100，0 为原始值，仅作用于底图显示）
+  contrast: number;
+  // 一键图像增强（CLAHE，后端处理），开启后底图换成增强版本
+  enhanced: boolean;
   showMask: boolean;
   // 草稿层显隐
   showDraft: boolean;
@@ -18,6 +24,9 @@ interface UIState {
 
   setTransform: (zoom: number, offsetX: number, offsetY: number) => void;
   fitToScreen: (imageWidth: number, imageHeight: number, viewWidth: number, viewHeight: number) => void;
+  setFittedImageId: (id: number | null) => void;
+  setContrast: (contrast: number) => void;
+  toggleEnhanced: () => void;
   setShowMask: (show: boolean) => void;
   setShowDraft: (show: boolean) => void;
   toggleFill: () => void;
@@ -33,6 +42,9 @@ export const useUIStore = create<UIState>((set) => ({
   zoom: 1,
   offsetX: 0,
   offsetY: 0,
+  fittedImageId: null,
+  contrast: 0,
+  enhanced: false,
   showMask: true,
   showDraft: true,
   showFill: true,
@@ -55,6 +67,9 @@ export const useUIStore = create<UIState>((set) => ({
     set({ zoom, offsetX, offsetY });
   },
 
+  setFittedImageId: (id) => set({ fittedImageId: id }),
+  setContrast: (contrast) => set({ contrast: Math.max(-100, Math.min(100, contrast)) }),
+  toggleEnhanced: () => set(s => ({ enhanced: !s.enhanced })),
   setShowMask: (show) => set({ showMask: show }),
   setShowDraft: (show) => set({ showDraft: show }),
   toggleFill: () => set(s => ({ showFill: !s.showFill })),

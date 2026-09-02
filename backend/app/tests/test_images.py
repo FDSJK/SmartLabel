@@ -66,6 +66,34 @@ class TestServeImageFile:
         resp = client.get("/api/images/99999/file", headers=_auth(token))
         assert resp.status_code == 404
 
+    def test_serve_enhanced_image_200(self, client: TestClient, tmp_work_dir: str):
+        token, user_id = _admin_token(client)
+
+        batches_dir = os.path.join(tmp_work_dir, "batches", "test-batch", "images")
+        os.makedirs(batches_dir)
+        # 带渐变的彩色图，确保 CLAHE（LAB 亮度通道）正常处理
+        arr = np.zeros((50, 50, 3), dtype=np.uint8)
+        arr[:, :, 0] = np.linspace(0, 255, 50, dtype=np.uint8)[None, :]
+        PILImage.fromarray(arr).save(os.path.join(batches_dir, "sample.png"))
+
+        from app.main import app
+        from app.core.db import get_db
+        db = next(app.dependency_overrides[get_db]())
+        from app.models.batch import Batch
+        from app.models.image import Image
+
+        batch = Batch(name="test-batch", source="upload", created_by=user_id)
+        db.add(batch); db.commit(); db.refresh(batch)
+        image = Image(batch_id=batch.id, file_name="sample.png",
+                      src_rel_path="batches/test-batch/images/sample.png",
+                      width=50, height=50, channels=3)
+        db.add(image); db.commit(); db.refresh(image)
+
+        resp = client.get(f"/api/images/{image.id}/file/enhanced", headers=_auth(token))
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "image/png"
+        assert len(resp.content) > 0
+
     def test_serve_image_requires_auth(self, client: TestClient):
         resp = client.get("/api/images/1/file")
         assert resp.status_code == 401

@@ -1,6 +1,7 @@
 import os
+import cv2
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.models.user import User
@@ -8,6 +9,7 @@ from app.api.deps import get_current_user, get_owned_image
 from app.models.batch import Batch
 from app.schemas.annotation import MaskExportRequest, MaskExportResponse
 from app.services.mask_export import export_image_masks
+from app.services.enhance import enhance_clahe
 from app.services.work_dir import get_work_dir
 
 router = APIRouter()
@@ -40,6 +42,35 @@ def serve_image_file(
     media_type = MIME_MAP.get(ext, "application/octet-stream")
 
     return FileResponse(abs_path, media_type=media_type)
+
+
+@router.get("/images/{image_id}/file/enhanced")
+def serve_enhanced_image_file(
+    image_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """返回 CLAHE 增强后的原图（用于前端「一键图像增强」显示）。"""
+    img = get_owned_image(db, current_user, image_id)
+
+    work_dir = get_work_dir(db, current_user)
+    rel_path = img.work_rel_path or img.src_rel_path
+    abs_path = os.path.join(work_dir, rel_path)
+
+    if not os.path.isfile(abs_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image file not found on disk")
+
+    arr = cv2.imread(abs_path, cv2.IMREAD_UNCHANGED)
+    if arr is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to decode image")
+
+    enhanced = enhance_clahe(arr)
+
+    ok, buf = cv2.imencode(".png", enhanced)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to encode enhanced image")
+
+    return Response(content=buf.tobytes(), media_type="image/png")
 
 
 @router.post("/images/{image_id}/export-mask", response_model=MaskExportResponse)

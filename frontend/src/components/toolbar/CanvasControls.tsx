@@ -21,6 +21,10 @@ export default function CanvasControls() {
   const zoom = useUIStore(s => s.zoom);
   const showFill = useUIStore(s => s.showFill);
   const toggleFill = useUIStore(s => s.toggleFill);
+  const contrast = useUIStore(s => s.contrast);
+  const setContrast = useUIStore(s => s.setContrast);
+  const enhanced = useUIStore(s => s.enhanced);
+  const toggleEnhanced = useUIStore(s => s.toggleEnhanced);
   const currentImage = useImageStore(s => s.currentImage);
   const lockedByMe = useImageStore(s => s.lockedByMe);
   const labelStatus = useEditorStore(s => s.labelStatus);
@@ -118,6 +122,35 @@ export default function CanvasControls() {
       >
         {showFill ? '▣' : '□'}
         <span className={styles.tooltip}>{showFill ? '隐藏填充' : '显示填充'}</span>
+      </button>
+
+      <span className={styles.sep} />
+
+      <label className={styles.contrast} title="调整原图对比度">
+        <span className={styles.contrastLabel}>对比度</span>
+        <input
+          type="range"
+          min={-100}
+          max={100}
+          step={1}
+          value={contrast}
+          onChange={(e) => setContrast(Number(e.target.value))}
+          onDoubleClick={() => setContrast(0)}
+        />
+        <span className={styles.contrastValue}>{contrast > 0 ? `+${contrast}` : contrast}</span>
+      </label>
+      {contrast !== 0 && (
+        <button className={styles.btn} onClick={() => setContrast(0)} title="重置对比度">
+          ↺
+        </button>
+      )}
+
+      <button
+        className={`${styles.btn} ${enhanced ? styles.btnActive : ''}`}
+        onClick={toggleEnhanced}
+        title={enhanced ? '关闭图像增强' : '一键图像增强（CLAHE）'}
+      >
+        ✨
       </button>
 
       <span className={styles.sep} />

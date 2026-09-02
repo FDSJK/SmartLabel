@@ -15,7 +15,7 @@ import styles from './KonvaStage.module.css';
 export default function KonvaStage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
-  const [size, setSize] = useState({ width: 800, height: 600 });
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
   const currentImage = useImageStore(s => s.currentImage);
   const zoom = useUIStore(s => s.zoom);
@@ -40,13 +40,20 @@ export default function KonvaStage() {
     return () => ro.disconnect();
   }, []);
 
-  // Fit image when first loaded
+  // Fit image when first loaded (or when switching to a new image).
+  // 路由切换回来时容器尺寸尚未测量（size 为 0），需等 ResizeObserver 测出真实尺寸再 fit；
+  // 已适配过的图像不再重新 fit，以保留用户此前的缩放/平移。
   useEffect(() => {
-    if (currentImage && currentImage.width > 0 && currentImage.height > 0) {
-      const { fitToScreen } = useUIStore.getState();
-      fitToScreen(currentImage.width, currentImage.height, size.width, size.height);
+    const ui = useUIStore.getState();
+    if (!currentImage || currentImage.width <= 0 || currentImage.height <= 0) {
+      ui.setFittedImageId(null);
+      return;
     }
-  }, [currentImage?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (size.width <= 0 || size.height <= 0) return;
+    if (ui.fittedImageId === currentImage.id) return;
+    ui.setFittedImageId(currentImage.id);
+    ui.fitToScreen(currentImage.width, currentImage.height, size.width, size.height);
+  }, [currentImage?.id, currentImage?.width, currentImage?.height, size.width, size.height]);
 
   // Wheel zoom
   const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {

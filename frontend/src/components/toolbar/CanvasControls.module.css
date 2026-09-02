@@ -45,6 +45,12 @@
   cursor: default;
 }
 
+.btnActive {
+  background: rgba(124, 156, 255, 0.25);
+  border-color: rgba(124, 156, 255, 0.7);
+  color: #fff;
+}
+
 .tooltip {
   position: absolute;
   top: calc(100% + 7px);
@@ -79,5 +85,34 @@
 .metric {
   color: #c2c8cf;
   font-size: 12px;
+  white-space: nowrap;
+}
+
+.contrast {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: default;
+}
+
+.contrastLabel {
+  color: #c2c8cf;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.contrast input[type='range'] {
+  width: 72px;
+  height: 2px;
+  accent-color: #7c9cff;
+  cursor: pointer;
+}
+
+.contrastValue {
+  color: #c2c8cf;
+  font-size: 11px;
+  min-width: 24px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
