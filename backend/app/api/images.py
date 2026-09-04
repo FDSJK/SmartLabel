@@ -9,7 +9,7 @@ from app.api.deps import get_current_user, get_owned_image
 from app.models.batch import Batch
 from app.schemas.annotation import MaskExportRequest, MaskExportResponse
 from app.services.mask_export import export_image_masks
-from app.services.enhance import enhance_clahe
+from app.services.enhance import enhance_clahe, read_image
 from app.services.work_dir import get_work_dir
 
 router = APIRouter()
@@ -60,7 +60,7 @@ def serve_enhanced_image_file(
     if not os.path.isfile(abs_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image file not found on disk")
 
-    arr = cv2.imread(abs_path, cv2.IMREAD_UNCHANGED)
+    arr = read_image(abs_path)
     if arr is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to decode image")
 
