@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState } from 'react';
-import { Circle, Line, Rect, Group } from 'react-konva';
+import { Circle, Line, Rect, Group, Label, Tag, Text } from 'react-konva';
 import { useEditorStore } from '../../stores/editorStore';
 import { useDraftStore } from '../../stores/draftStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -60,6 +60,7 @@ export default function DrawingLayer() {
   const shapes = useEditorStore(s => s.shapes);
   const selectedShapeId = useEditorStore(s => s.selectedShapeId);
   const showMask = useUIStore(s => s.showMask);
+  const hiddenLabels = useUIStore(s => s.hiddenLabels);
   const labels = useLabelStore(s => s.labels);
   const currentImage = useImageStore(s => s.currentImage);
 
@@ -377,29 +378,40 @@ export default function DrawingLayer() {
       }
 
       const store = useEditorStore.getState();
-      const currentShapes = store.shapes;
+      // 被隐藏（眼睛关闭）的标签不参与双击选中：其 mask 不可见，不应被选中。
+      // 否则重叠区域内双击会选到看不见的形状。
+      const hiddenLabels = useUIStore.getState().hiddenLabels;
+      const currentShapes = store.shapes.filter(s => !hiddenLabels[s.label]);
 
-      // 1) Check vertices
+      // 1) 命中形状内部（含多个重叠 shape，不同标签互相压盖）：按视觉层叠顺序
+      //    （后渲染的在上层）循环选中，从而能选到被遮住的隐藏标签。
+      //    必须放在顶点/边检测之前——否则重叠区域内的点击总被最近顶点/边抢走，
+      //    每次选中同一个 shape，永远切不到下面的标签。
+      const hits = currentShapes
+        .filter(shape => isPointInShape(ix, iy, shape.points, shape.holes ?? []))
+        .reverse(); // reverse → 最上层在前
+      if (hits.length > 0) {
+        const currentId = store.selectedShapeId;
+        const idx = hits.findIndex(s => s.id === currentId);
+        const next = idx >= 0 ? hits[(idx + 1) % hits.length] : hits[0];
+        store.selectShape(next.id);
+        useDraftStore.getState().selectDraft(null);
+        return;
+      }
+
+      // 2) 点不在任何形状内但靠近顶点：选中该形状（兜底）
       const v = findNearestVertex(ix, iy, currentShapes, DBLCLICK_HIT_RADIUS);
       if (v) {
         store.selectShape(v.shapeId);
         useDraftStore.getState().selectDraft(null);
         return;
       }
-      // 2) Check edges
+      // 3) 靠近边：选中该形状（兜底）
       const edgeId = findNearestShape(ix, iy, currentShapes, DBLCLICK_HIT_RADIUS);
       if (edgeId) {
         store.selectShape(edgeId);
         useDraftStore.getState().selectDraft(null);
         return;
-      }
-      // 3) Check if point is inside any shape
-      for (const shape of currentShapes) {
-        if (isPointInShape(ix, iy, shape.points, shape.holes ?? [])) {
-          store.selectShape(shape.id);
-          useDraftStore.getState().selectDraft(null);
-          return;
-        }
       }
       // Double-click on empty → deselect
       store.selectShape(null);
@@ -430,9 +442,11 @@ export default function DrawingLayer() {
     ? [...previewFlat, cursorPos[0], cursorPos[1]]
     : previewFlat;
 
-  const selectedShape = selectedShapeId
+  const foundShape = selectedShapeId
     ? (shapes.find(s => s.id === selectedShapeId) ?? null)
     : null;
+  // 标签被隐藏（眼睛关闭）后，其选中态（外框 / 名字徽章 / 顶点手柄 / 删除按钮）一并隐藏
+  const selectedShape = foundShape && !hiddenLabels[foundShape.label] ? foundShape : null;
 
   // Highlight the selected shape in its own label color, not a fixed cyan
   const selectedShapeColor = selectedShape
@@ -525,6 +539,36 @@ export default function DrawingLayer() {
           listening={false}
         />
       )}
+
+      {/* Selected shape label name badge — 循环选中重叠标签时展示名字 */}
+      {selectedShape && (isSelecting || isAdding || isCutting) && (() => {
+        const pts = selectedShape.points;
+        let minX = Infinity, minY = Infinity;
+        for (const [x, y] of pts) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+        }
+        return (
+          <Label x={minX} y={minY - 32} listening={false}>
+            <Tag
+              fill={selectedShapeColor}
+              cornerRadius={4}
+              opacity={0.92}
+              shadowColor="rgba(0,0,0,0.5)"
+              shadowBlur={4}
+              shadowOffsetY={1}
+            />
+            <Text
+              text={selectedShape.label}
+              fill="#fff"
+              fontSize={13}
+              fontStyle="bold"
+              padding={6}
+              listening={false}
+            />
+          </Label>
+        );
+      })()}
 
       {/* Select: vertex handles */}
       {isSelecting && selectedShape &&

@@ -22,6 +22,26 @@ function indexOfLargest(pieces: PolyWithHoles[]): number {
   return best;
 }
 
+/** Axis-aligned bounding box of a point list: [minX, minY, maxX, maxY]. */
+function bboxOf(points: number[][]): [number, number, number, number] {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of points) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  return [minX, minY, maxX, maxY];
+}
+
+/** True if two bounding boxes overlap (inclusive, so edge-touching counts). */
+function bboxIntersects(
+  a: [number, number, number, number],
+  b: [number, number, number, number],
+): boolean {
+  return a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
+}
+
 function cloneShape(s: Shape): Shape {
   return {
     ...s,
@@ -200,30 +220,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const selected = shapes.find(s => s.id === selectedShapeId);
     if (!selected) return;
 
-    // Collect all shapes of the same label for merging
-    const sameLabel = shapes.filter(s => s.label === selected.label && s.id !== selected.id);
-
     // Start with (selected + drawn)
     const selPoly: PolyWithHoles = { points: selected.points, holes: selected.holes ?? [] };
     const drawnPoly: PolyWithHoles = { points: drawnPoints, holes: [] };
     let merged = unionPolygons(selPoly, drawnPoly);
-    // Also merge any same-label shapes that the drawn area connects
-    if (sameLabel.length > 0 && merged.length > 0) {
-      const allPieces: PolyWithHoles[] = [
-        ...merged,
-        ...sameLabel.map(s => ({ points: s.points, holes: s.holes ?? [] })),
-      ];
-      merged = unionMany(allPieces);
-    }
 
     if (merged.length === 0) return;
+
+    // 只合并与绘制区域真正重叠的同标签形状：先用包围盒排除绝大多数远距离 mask，
+    // 再对少数候选做精确重叠判断。避免对几百个 mask 逐个做并集导致增添响应缓慢
+    // （裁剪只做一次差集，所以不受影响）。
+    const drawnBBox = bboxOf(drawnPoints);
+    const absorbedIds = new Set<string>([selected.id]);
+    const absorbed: PolyWithHoles[] = [];
+    for (const s of shapes) {
+      if (s.id === selected.id || s.label !== selected.label) continue;
+      if (!bboxIntersects(bboxOf(s.points), drawnBBox)) continue;
+      const sp: PolyWithHoles = { points: s.points, holes: s.holes ?? [] };
+      if (polygonsOverlap(drawnPoly, sp)) {
+        absorbedIds.add(s.id);
+        absorbed.push(sp);
+      }
+    }
+    if (absorbed.length > 0) {
+      merged = unionMany([...merged, ...absorbed]);
+    }
 
     const snapshot = cloneSnapshot(shapes, labelStatus);
     const undoStack = [...get().undoStack, snapshot].slice(-MAX_UNDO);
 
-    // Remove all merged shapes (selected + same-label), will be recreated
-    const mergedIds = new Set([selected.id, ...sameLabel.map(s => s.id)]);
-    const remaining = shapes.filter(s => !mergedIds.has(s.id));
+    const remaining = shapes.filter(s => !absorbedIds.has(s.id));
 
     // Create new shapes from the merged multi-polygon result.
     // polygon-clipping may reorder pieces, so `merged[0]` is not guaranteed to
