@@ -115,7 +115,7 @@ export default function AnnotationPage() {
       return;
     }
 
-    // Escape — cancel drawing or deselect
+    // Escape — cancel drawing or deselect（不切换工具，保持当前工具不变）
     if (e.key === 'Escape') {
       if (store.drawingPoints !== null) {
         store.cancelDrawing();
@@ -123,7 +123,6 @@ export default function AnnotationPage() {
         store.selectShape(null);
       }
       useDraftStore.getState().selectDraft(null);
-      store.setTool('polygon');
       return;
     }
 

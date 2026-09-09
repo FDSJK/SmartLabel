@@ -17,6 +17,8 @@ export default function CanvasControls() {
   const redoStackLen = useEditorStore(s => s.redoStack.length);
   const undo = useEditorStore(s => s.undo);
   const redo = useEditorStore(s => s.redo);
+  const drawingPoints = useEditorStore(s => s.drawingPoints);
+  const cancelDrawing = useEditorStore(s => s.cancelDrawing);
   const shapeCount = useEditorStore(s => s.shapes.length);
   const zoom = useUIStore(s => s.zoom);
   const showFill = useUIStore(s => s.showFill);
@@ -113,6 +115,16 @@ export default function CanvasControls() {
         ↪
         <span className={styles.tooltip}>重做 Ctrl+Shift+Z</span>
       </button>
+
+      {drawingPoints !== null && (
+        <button
+          className={`${styles.btn} ${styles.btnCancel}`}
+          onClick={cancelDrawing}
+        >
+          ✕ 取消绘制
+          <span className={styles.tooltip}>取消当前绘制（Esc 在全屏时会被 Safari 占用）</span>
+        </button>
+      )}
 
       <span className={styles.sep} />
 

@@ -12,6 +12,9 @@ import DraftLayer from './DraftLayer';
 import DrawingLayer from './DrawingLayer';
 import styles from './KonvaStage.module.css';
 
+/** 是否为 macOS：Mac 上 Ctrl+点击是右键，平移快捷键应为 Cmd(metaKey)。 */
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+
 export default function KonvaStage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -80,7 +83,10 @@ export default function KonvaStage() {
   const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
     const clickedOnStage = e.target === e.target.getStage();
     if (!clickedOnStage) return;
-    if (e.evt.ctrlKey || e.evt.metaKey || e.evt.button === 1) {
+    // Mac 上 Ctrl+点击是右键，交给 contextmenu 处理，不当作平移。
+    if (IS_MAC && e.evt.ctrlKey && e.evt.button === 0) return;
+    // 平移：Mac 用 Cmd(metaKey)，其他平台用 Ctrl；中键通用。
+    if ((IS_MAC ? e.evt.metaKey : e.evt.ctrlKey) || e.evt.button === 1) {
       isPanning.current = true;
       const pos = stageRef.current?.getPointerPosition();
       if (pos) lastPointer.current = { x: pos.x, y: pos.y };

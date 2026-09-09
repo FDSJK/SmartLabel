@@ -15,6 +15,9 @@ const FREIHAND_MIN_DIST = 5;
 const DRAG_THRESHOLD = 10;
 const DBLCLICK_HIT_RADIUS = 24;
 
+/** 是否为 macOS：Mac 上 Ctrl+点击是右键，平移快捷键应为 Cmd(metaKey)。 */
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+
 /** Convert stage pointer position to image coordinates */
 function toImageCoords(stageX: number, stageY: number): [number, number] {
   const { zoom, offsetX, offsetY } = useUIStore.getState();
@@ -114,7 +117,15 @@ export default function DrawingLayer() {
       const pos = stage.getPointerPosition();
       if (!pos) return;
 
-      const panKey = e.evt.ctrlKey || e.evt.metaKey || e.evt.button === 1;
+      // Mac 上 Ctrl+点击是右键（contextmenu），用于闭合/取消多边形与自由绘制。
+      // 它用的是左键（button === 0），不能当作平移，也不能落入下面的绘制分支，
+      // 否则会误增一个顶点 / 重新起笔。这里直接返回，交给 onContextMenu 处理。
+      if (IS_MAC && e.evt.ctrlKey && e.evt.button === 0) {
+        return;
+      }
+
+      // 平移：Mac 用 Cmd(metaKey)，其他平台用 Ctrl；中键(button 1)通用。
+      const panKey = (IS_MAC ? e.evt.metaKey : e.evt.ctrlKey) || e.evt.button === 1;
       if (panKey && (drawingActive || editActive || boolOpActive)) {
         isPanning.current = true;
         lastPanPointer.current = { x: pos.x, y: pos.y };

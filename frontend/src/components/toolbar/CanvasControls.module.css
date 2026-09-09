@@ -51,6 +51,15 @@
   color: #fff;
 }
 
+.btnCancel {
+  border-color: rgba(255, 122, 122, 0.55);
+  color: #ffb4b4;
+}
+
+.btnCancel:hover:not(:disabled) {
+  background: rgba(255, 122, 122, 0.18);
+}
+
 .tooltip {
   position: absolute;
   top: calc(100% + 7px);
