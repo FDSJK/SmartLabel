@@ -513,18 +513,6 @@ export default function DrawingLayer() {
             strokeWidth={2} listening={false} />
         ))}
 
-      {drawingActive && currentTool === 'freehand' && drawingPoints && drawingPoints.length > 1 && (
-        <>
-          <Circle x={drawingPoints[0][0]} y={drawingPoints[0][1]}
-            radius={VERTEX_RADIUS + 1} fill="white" stroke={labelColor}
-            strokeWidth={2} listening={false} />
-          <Circle x={drawingPoints[drawingPoints.length - 1][0]}
-            y={drawingPoints[drawingPoints.length - 1][1]}
-            radius={VERTEX_RADIUS + 1} fill={labelColor} stroke="white"
-            strokeWidth={1.5} listening={false} />
-        </>
-      )}
-
       {/* Selected shape outline — visible in select / add / cut modes */}
       {selectedShape && (isSelecting || isAdding || isCutting) && (
         <Line
