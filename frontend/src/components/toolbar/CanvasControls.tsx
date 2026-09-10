@@ -18,6 +18,7 @@ export default function CanvasControls() {
   const undo = useEditorStore(s => s.undo);
   const redo = useEditorStore(s => s.redo);
   const drawingPoints = useEditorStore(s => s.drawingPoints);
+  const finishDrawing = useEditorStore(s => s.finishDrawing);
   const cancelDrawing = useEditorStore(s => s.cancelDrawing);
   const shapeCount = useEditorStore(s => s.shapes.length);
   const zoom = useUIStore(s => s.zoom);
@@ -117,13 +118,23 @@ export default function CanvasControls() {
       </button>
 
       {drawingPoints !== null && (
-        <button
-          className={`${styles.btn} ${styles.btnCancel}`}
-          onClick={cancelDrawing}
-        >
-          ✕ 取消绘制
-          <span className={styles.tooltip}>取消当前绘制（Esc 在全屏时会被 Safari 占用）</span>
-        </button>
+        <>
+          <button
+            className={`${styles.btn} ${styles.btnFinish}`}
+            disabled={drawingPoints.length < 3}
+            onClick={finishDrawing}
+          >
+            ✓ 闭合
+            <span className={styles.tooltip}>闭合当前多边形/曲线</span>
+          </button>
+          <button
+            className={`${styles.btn} ${styles.btnCancel}`}
+            onClick={cancelDrawing}
+          >
+            ✕ 取消绘制
+            <span className={styles.tooltip}>取消当前绘制（Esc 在全屏时会被 Safari 占用）</span>
+          </button>
+        </>
       )}
 
       <span className={styles.sep} />

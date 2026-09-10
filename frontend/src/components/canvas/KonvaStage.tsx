@@ -120,8 +120,19 @@ export default function KonvaStage() {
     else useEditorStore.getState().cancelDrawing();
   }, []);
 
+  // 自由绘制：双击左键闭合。用容器级原生 dblclick（而非 Konva 合成的 dblclick），
+  // 与 contextmenu 同思路，在 macOS/Safari 上更可靠；选择/增添/裁剪的双击选中
+  // 仍由 Konva 节点自身的 onDblClick 处理，此处仅处理自由绘制。
+  const handleDoubleClick = useCallback(() => {
+    const { currentTool, drawingPoints } = useEditorStore.getState();
+    if (currentTool !== 'freehand') return;
+    if (drawingPoints === null) return;
+    if (drawingPoints.length >= 3) useEditorStore.getState().finishDrawing();
+    else useEditorStore.getState().cancelDrawing();
+  }, []);
+
   return (
-    <div ref={containerRef} className={styles.container} onContextMenu={handleContextMenu}>
+    <div ref={containerRef} className={styles.container} onContextMenu={handleContextMenu} onDoubleClick={handleDoubleClick}>
       {!currentImage ? (
         <div className={styles.placeholder}>选择一张图像开始标注</div>
       ) : (

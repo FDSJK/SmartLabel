@@ -60,6 +60,15 @@
   background: rgba(255, 122, 122, 0.18);
 }
 
+.btnFinish {
+  border-color: rgba(124, 156, 255, 0.55);
+  color: #a8c0ff;
+}
+
+.btnFinish:hover:not(:disabled) {
+  background: rgba(124, 156, 255, 0.18);
+}
+
 .tooltip {
   position: absolute;
   top: calc(100% + 7px);

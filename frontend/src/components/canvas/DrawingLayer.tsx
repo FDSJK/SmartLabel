@@ -365,18 +365,10 @@ export default function DrawingLayer() {
   // --- Double-click: select shape (on Rect) ---
   const handleDblClick = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
-      // 自由绘制：双击左键闭合当前曲线（替代右键，兼容 Mac/Safari 的右键手势差异）
-      if (currentTool === 'freehand') {
-        const store = useEditorStore.getState();
-        if (store.drawingPoints && store.drawingPoints.length >= 3) {
-          store.finishDrawing();
-        } else if (store.drawingPoints !== null) {
-          store.cancelDrawing();
-        }
-        return;
-      }
-
-      // Double-click selection works in select / add / cut modes
+      // Double-click selection works in select / add / cut modes.
+      // 自由绘制的「双击闭合」改由容器级原生 dblclick 处理（见 KonvaStage），
+      // 不再走 Konva 合成的 dblclick——它按 mousedown/mouseup 计数，绘制松手时
+      // 已把双击窗口占用，导致下一次单击被误判为双击、行为不稳定。
       if (!isSelecting && !isAdding && !isCutting) return;
 
       const stage = e.target.getStage();
@@ -444,7 +436,7 @@ export default function DrawingLayer() {
       store.selectShape(null);
       useDraftStore.getState().selectDraft(null);
     },
-    [currentTool, isSelecting, isAdding, isCutting],
+    [isSelecting, isAdding, isCutting],
   );
 
   const handleMouseLeave = useCallback(() => {
