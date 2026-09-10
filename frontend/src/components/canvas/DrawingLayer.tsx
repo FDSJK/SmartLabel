@@ -146,7 +146,12 @@ export default function DrawingLayer() {
         }
         if (currentTool === 'freehand' && e.evt.button === 0) {
           const store = useEditorStore.getState();
-          if (store.drawingPoints === null) store.startDrawing();
+          // 已有未闭合曲线（松手后等待双击闭合）时不再新增点，
+          // 否则双击闭合的两次 mousedown 会误加孤立点。
+          if (store.drawingPoints !== null) {
+            return;
+          }
+          store.startDrawing();
           store.addDrawingPoint(ix, iy);
           freehandActive.current = true;
           lastFreehandPoint.current = [ix, iy];
@@ -330,14 +335,6 @@ export default function DrawingLayer() {
       if (currentTool === 'freehand' && freehandActive.current) {
         freehandActive.current = false;
         lastFreehandPoint.current = null;
-        // 自由绘制在松开鼠标时即闭合整条曲线（无需右键）。
-        // 此前依赖右键闭合，但 Mac 上右键手势（Ctrl+点击/双指轻点/外接鼠标）
-        // 与 contextmenu 的触发时序差异大，容易失效；改为松手即闭合更可靠。
-        const store = useEditorStore.getState();
-        const pts = store.drawingPoints;
-        if (pts && pts.length >= 3) store.finishDrawing();
-        else store.cancelDrawing();
-        setCursorPos(null);
         e.evt.preventDefault();
       }
 
@@ -368,6 +365,17 @@ export default function DrawingLayer() {
   // --- Double-click: select shape (on Rect) ---
   const handleDblClick = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
+      // 自由绘制：双击左键闭合当前曲线（替代右键，兼容 Mac/Safari 的右键手势差异）
+      if (currentTool === 'freehand') {
+        const store = useEditorStore.getState();
+        if (store.drawingPoints && store.drawingPoints.length >= 3) {
+          store.finishDrawing();
+        } else if (store.drawingPoints !== null) {
+          store.cancelDrawing();
+        }
+        return;
+      }
+
       // Double-click selection works in select / add / cut modes
       if (!isSelecting && !isAdding && !isCutting) return;
 
@@ -436,7 +444,7 @@ export default function DrawingLayer() {
       store.selectShape(null);
       useDraftStore.getState().selectDraft(null);
     },
-    [isSelecting, isAdding, isCutting],
+    [currentTool, isSelecting, isAdding, isCutting],
   );
 
   const handleMouseLeave = useCallback(() => {
