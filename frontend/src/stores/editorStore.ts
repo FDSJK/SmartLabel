@@ -153,6 +153,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   finishDrawing: () => {
     const { drawingPoints, shapes, labelStatus, selectedLabel } = get();
+    // 诊断日志：闭合失败时可在控制台看到点数与标签状态
+    console.log('[finishDrawing]', { points: drawingPoints?.length ?? 0, selectedLabel });
     if (!drawingPoints || drawingPoints.length < 3 || !selectedLabel) return;
 
     const shape: Shape = {
