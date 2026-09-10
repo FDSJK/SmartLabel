@@ -330,6 +330,14 @@ export default function DrawingLayer() {
       if (currentTool === 'freehand' && freehandActive.current) {
         freehandActive.current = false;
         lastFreehandPoint.current = null;
+        // 自由绘制在松开鼠标时即闭合整条曲线（无需右键）。
+        // 此前依赖右键闭合，但 Mac 上右键手势（Ctrl+点击/双指轻点/外接鼠标）
+        // 与 contextmenu 的触发时序差异大，容易失效；改为松手即闭合更可靠。
+        const store = useEditorStore.getState();
+        const pts = store.drawingPoints;
+        if (pts && pts.length >= 3) store.finishDrawing();
+        else store.cancelDrawing();
+        setCursorPos(null);
         e.evt.preventDefault();
       }
 
