@@ -11,6 +11,28 @@ import {
 
 const MAX_UNDO = 50;
 
+/**
+ * 生成唯一 id。crypto.randomUUID 仅在安全上下文（HTTPS / localhost）可用，
+ * 通过 http://192.168.x.x 这类非安全上下文远程访问时不可用，调用会抛
+ * TypeError（导致 finishDrawing/applyAdd/applyCut 静默失败、标注不落地）。
+ * 这里退化为 crypto.getRandomValues（http 下仍可用），再兜底 Math.random。
+ */
+function uuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 /** Index of the piece with the largest area. */
 function indexOfLargest(pieces: PolyWithHoles[]): number {
   let best = 0;
@@ -153,12 +175,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   finishDrawing: () => {
     const { drawingPoints, shapes, labelStatus, selectedLabel } = get();
-    // 诊断日志：闭合失败时可在控制台看到点数与标签状态
-    console.log('[finishDrawing]', { points: drawingPoints?.length ?? 0, selectedLabel });
     if (!drawingPoints || drawingPoints.length < 3 || !selectedLabel) return;
 
     const shape: Shape = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       label: selectedLabel,
       shapeType: 'polygon',
       points: drawingPoints.map(p => [...p]),
@@ -261,7 +281,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (selectedIdx === -1) selectedIdx = indexOfLargest(merged);
 
     const newShapes: Shape[] = merged.map((p, i) => ({
-      id: i === selectedIdx ? selected.id : crypto.randomUUID(),
+      id: i === selectedIdx ? selected.id : uuid(),
       label: selected.label,
       shapeType: 'polygon' as const,
       points: p.points,
@@ -313,7 +333,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const others = shapes.filter(s => s.id !== selected.id);
     const selectedIdx = indexOfLargest(result);
     const newShapes: Shape[] = result.map((p, i) => ({
-      id: i === selectedIdx ? selected.id : crypto.randomUUID(),
+      id: i === selectedIdx ? selected.id : uuid(),
       label: selected.label,
       shapeType: 'polygon' as const,
       points: p.points,

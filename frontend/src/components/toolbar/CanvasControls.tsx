@@ -121,14 +121,8 @@ export default function CanvasControls() {
         <>
           <button
             className={`${styles.btn} ${styles.btnFinish}`}
-            onClick={() => {
-              // 诊断：点数不足时给出明确提示，而不是静默无反应
-              if (drawingPoints.length < 3) {
-                window.alert(`需要至少 3 个点才能闭合（当前 ${drawingPoints.length} 点）`);
-                return;
-              }
-              finishDrawing();
-            }}
+            disabled={drawingPoints.length < 3}
+            onClick={finishDrawing}
           >
             ✓ 闭合
             <span className={styles.tooltip}>闭合当前多边形/曲线（至少 3 点）</span>
@@ -140,7 +134,6 @@ export default function CanvasControls() {
             ✕ 取消绘制
             <span className={styles.tooltip}>取消当前绘制（Esc 在全屏时会被 Safari 占用）</span>
           </button>
-          <span className={styles.metric}>{drawingPoints.length} 点</span>
         </>
       )}
 

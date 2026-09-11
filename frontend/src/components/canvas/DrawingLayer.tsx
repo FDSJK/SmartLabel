@@ -141,7 +141,6 @@ export default function DrawingLayer() {
           const store = useEditorStore.getState();
           if (store.drawingPoints === null) store.startDrawing();
           store.addDrawingPoint(ix, iy);
-          console.log('[polygon mousedown]', { button: e.evt.button, points: useEditorStore.getState().drawingPoints?.length ?? 0 });
           e.evt.preventDefault();
           return;
         }
@@ -156,7 +155,6 @@ export default function DrawingLayer() {
           store.addDrawingPoint(ix, iy);
           freehandActive.current = true;
           lastFreehandPoint.current = [ix, iy];
-          console.log('[freehand mousedown]', { points: useEditorStore.getState().drawingPoints?.length ?? 0 });
           e.evt.preventDefault();
           return;
         }
