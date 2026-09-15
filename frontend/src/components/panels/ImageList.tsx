@@ -32,6 +32,7 @@ export default function ImageList() {
   const jobsByImage = useInferenceStore(s => s.jobsByImage);
   const updateImageFlag = useBatchStore(s => s.updateImageFlag);
   const [query, setQuery] = useState('');
+  const [onlyFlagged, setOnlyFlagged] = useState(false);
 
   // 切换批次时加载该批次的推理任务状态，并在有排队/运行中任务时轮询更新
   useEffect(() => {
@@ -64,9 +65,11 @@ export default function ImageList() {
   }
 
   const q = query.trim().toLowerCase();
-  const filtered = q
-    ? images.filter(img => img.file_name.toLowerCase().includes(q))
-    : images;
+  const filtered = images.filter(img => {
+    const matchesQuery = !q || img.file_name.toLowerCase().includes(q);
+    const matchesFlag = !onlyFlagged || img.flagged;
+    return matchesQuery && matchesFlag;
+  });
 
   return (
     <div className={styles.wrapper}>
@@ -78,6 +81,15 @@ export default function ImageList() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        <button
+          className={`${styles.flagFilter} ${onlyFlagged ? styles.flagFilterActive : ''}`}
+          onClick={() => setOnlyFlagged(v => !v)}
+          title={onlyFlagged ? '显示全部图像' : '只看重点标记'}
+          aria-pressed={onlyFlagged}
+        >
+          <span className={styles.flagDot} aria-hidden="true">●</span>
+          只看重点
+        </button>
       </div>
       {images.length === 0 ? (
         <div className={styles.empty}>暂无图像</div>
