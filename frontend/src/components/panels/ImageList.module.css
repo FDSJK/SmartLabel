@@ -21,27 +21,68 @@
 }
 .filterInput:focus { border-color: var(--color-primary, #00bcd4); }
 .filterInput::placeholder { color: var(--color-text-muted); }
-.flagFilter {
-  flex-shrink: 0;
+.filterDropdown { position: relative; flex-shrink: 0; }
+.filterTrigger {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 10px;
-  font-size: 12px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   color: var(--color-text-muted);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  white-space: nowrap;
 }
-.flagFilter:hover { border-color: var(--color-danger); }
-.flagFilterActive {
-  color: var(--color-danger);
-  border-color: var(--color-danger);
-  background: rgba(220, 38, 38, 0.08);
+.filterTrigger:hover { color: var(--color-text); border-color: var(--color-primary); }
+.filterTriggerActive { color: var(--color-primary); border-color: var(--color-primary); }
+.filterCount {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  color: #fff;
+  background: var(--color-primary);
+  border-radius: 8px;
 }
-.flagDot { font-size: 10px; line-height: 1; }
+.dropdownBackdrop { position: fixed; inset: 0; z-index: 10; }
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 44px;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.dropdownItem:hover { background: var(--color-bg); }
+.dropdownItemActive { background: var(--color-selected, rgba(37, 99, 235, 0.12)); }
+.colorDot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.dropdownCheck { width: 12px; font-size: 12px; color: var(--color-text); text-align: center; }
 .list { overflow-y: auto; flex: 1; }
 .item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--color-border); font-size: 13px; cursor: pointer; }
 .item:hover { background: var(--color-bg); }
