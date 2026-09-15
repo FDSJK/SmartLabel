@@ -40,6 +40,8 @@ def test_migrations_upgrade_pre_v2(tmp_path):
     with engine.connect() as conn:
         cols = [r[1] for r in conn.execute(text("PRAGMA table_info(users)"))]
         assert "work_dir" in cols
+        img_cols = [r[1] for r in conn.execute(text("PRAGMA table_info(images)"))]
+        assert "flagged" in img_cols
         assert conn.execute(text("SELECT created_by FROM batches WHERE id=1")).scalar() == 1
         conn.execute(text(
             "INSERT INTO users (id, username, password_hash, role, is_active, created_at) "

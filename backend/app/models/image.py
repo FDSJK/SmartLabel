@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, Integer, DateTime, ForeignKey
+from sqlalchemy import String, Integer, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db import Base
 
@@ -19,6 +19,8 @@ class Image(Base):
     locked_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     locked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     annotation_rev: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # 重点标记：左侧图像列表点击圆圈切换的红色标记，独立于标注状态（status）
+    flagged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )

@@ -37,6 +37,7 @@ export interface ImageInfo {
   locked_by: number | null;
   locked_by_username: string | null;
   annotation_rev: number;
+  flagged: boolean;
   created_at: string;
   updated_at: string;
 }

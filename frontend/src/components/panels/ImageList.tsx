@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useBatchStore } from '../../stores/batchStore';
 import { useImageStore } from '../../stores/imageStore';
 import { useInferenceStore } from '../../stores/inferenceStore';
+import { setImageFlag } from '../../api/images';
+import type { ImageInfo } from '../../types/api';
 import styles from './ImageList.module.css';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -28,6 +30,7 @@ export default function ImageList() {
   const loadImage = useImageStore(s => s.loadImage);
   const currentImageId = useImageStore(s => s.currentImage?.id);
   const jobsByImage = useInferenceStore(s => s.jobsByImage);
+  const updateImageFlag = useBatchStore(s => s.updateImageFlag);
   const [query, setQuery] = useState('');
 
   // 切换批次时加载该批次的推理任务状态，并在有排队/运行中任务时轮询更新
@@ -51,6 +54,13 @@ export default function ImageList() {
 
   async function handleClick(imageId: number) {
     await loadImage(imageId);
+  }
+
+  // 切换「重点标记」：乐观更新本地列表，失败时回滚
+  function toggleFlag(img: ImageInfo) {
+    const next = !img.flagged;
+    updateImageFlag(img.id, next);
+    setImageFlag(img.id, next).catch(() => updateImageFlag(img.id, img.flagged));
   }
 
   const q = query.trim().toLowerCase();
@@ -89,13 +99,26 @@ export default function ImageList() {
                 onKeyDown={(e) => { if (e.key === 'Enter') handleClick(img.id); }}
               >
                 <span className={styles.status}
-                  title={STATUS_LABELS[img.status] || img.status}
+                  title={img.flagged
+                    ? '重点标记（点击取消）'
+                    : `${STATUS_LABELS[img.status] || img.status}（点击标记为重点）`}
                   style={{
-                    color: img.status === 'done' ? 'var(--color-success)'
+                    color: img.flagged ? 'var(--color-danger)'
+                      : img.status === 'done' ? 'var(--color-success)'
                       : img.status === 'in_progress' ? 'var(--color-warning)'
                       : 'var(--color-text-muted)',
+                  }}
+                  onClick={(e) => { e.stopPropagation(); toggleFlag(img); }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleFlag(img);
+                    }
                   }}>
-                  {STATUS_ICONS[img.status] || '○'}
+                  {img.flagged ? '●' : (STATUS_ICONS[img.status] || '○')}
                 </span>
                 <span className={styles.name}>{img.file_name}</span>
                 {infer && (

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 import cv2
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse, Response
@@ -8,6 +9,7 @@ from app.models.user import User
 from app.api.deps import get_current_user, get_owned_image
 from app.models.batch import Batch
 from app.schemas.annotation import MaskExportRequest, MaskExportResponse
+from app.schemas.image import FlagUpdate
 from app.services.mask_export import export_image_masks
 from app.services.enhance import enhance_clahe, read_image
 from app.services.work_dir import get_work_dir
@@ -71,6 +73,21 @@ def serve_enhanced_image_file(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to encode enhanced image")
 
     return Response(content=buf.tobytes(), media_type="image/png")
+
+
+@router.put("/images/{image_id}/flag")
+def set_image_flag(
+    image_id: int,
+    body: FlagUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """切换/设置图像的「重点标记」（左侧列表红色圆点）。"""
+    img = get_owned_image(db, current_user, image_id)
+    img.flagged = body.flagged
+    img.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"flagged": img.flagged}
 
 
 @router.post("/images/{image_id}/export-mask", response_model=MaskExportResponse)

@@ -64,3 +64,11 @@ def run_migrations(engine) -> None:
             "(SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1) "
             "WHERE created_by IS NULL"
         ))
+
+    # 4) images.flagged 列（重点标记，红色圆点）
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(images)"))]
+        if "flagged" not in cols:
+            conn.execute(text(
+                "ALTER TABLE images ADD COLUMN flagged BOOLEAN NOT NULL DEFAULT 0"
+            ))

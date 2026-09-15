@@ -137,3 +137,54 @@ class TestExportMask:
         resp = client.post("/api/images/99999/export-mask",
                            json={"shapes": [], "labelStatus": {}}, headers=_auth(token))
         assert resp.status_code == 404
+
+
+class TestImageFlag:
+    def _setup(self, client, user_id):
+        from app.main import app
+        from app.core.db import get_db
+        from app.models.batch import Batch
+        from app.models.image import Image
+        db = next(app.dependency_overrides[get_db]())
+        batch = Batch(name="flag-batch", source="upload", created_by=user_id)
+        db.add(batch); db.commit(); db.refresh(batch)
+        image = Image(batch_id=batch.id, file_name="a.png",
+                      src_rel_path="batches/flag-batch/images/a.png",
+                      width=10, height=10, channels=3)
+        db.add(image); db.commit(); db.refresh(image)
+        return image
+
+    def test_toggle_flag(self, client):
+        token, user_id = _admin_token(client)
+        image = self._setup(client, user_id)
+
+        resp = client.put(f"/api/images/{image.id}/flag",
+                          json={"flagged": True}, headers=_auth(token))
+        assert resp.status_code == 200
+        assert resp.json() == {"flagged": True}
+
+        resp = client.put(f"/api/images/{image.id}/flag",
+                          json={"flagged": False}, headers=_auth(token))
+        assert resp.status_code == 200
+        assert resp.json() == {"flagged": False}
+
+    def test_flag_persisted_in_image_list(self, client):
+        token, user_id = _admin_token(client)
+        image = self._setup(client, user_id)
+
+        client.put(f"/api/images/{image.id}/flag",
+                   json={"flagged": True}, headers=_auth(token))
+
+        resp = client.get(f"/api/batches/{image.batch_id}/images", headers=_auth(token))
+        assert resp.status_code == 200
+        assert any(i["id"] == image.id and i["flagged"] is True for i in resp.json())
+
+    def test_flag_404(self, client):
+        token, _ = _admin_token(client)
+        resp = client.put("/api/images/99999/flag",
+                          json={"flagged": True}, headers=_auth(token))
+        assert resp.status_code == 404
+
+    def test_flag_requires_auth(self, client):
+        resp = client.put("/api/images/1/flag", json={"flagged": True})
+        assert resp.status_code == 401

@@ -13,7 +13,12 @@ class ImageResponse(BaseModel):
     locked_by: int | None
     locked_by_username: str | None = None
     annotation_rev: int
+    flagged: bool = False
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class FlagUpdate(BaseModel):
+    flagged: bool

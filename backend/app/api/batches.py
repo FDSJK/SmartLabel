@@ -47,6 +47,7 @@ def _image_to_response(img: Image, db: Session) -> ImageResponse:
         locked_by=img.locked_by,
         locked_by_username=locked_username,
         annotation_rev=img.annotation_rev,
+        flagged=img.flagged,
         created_at=img.created_at,
         updated_at=img.updated_at,
     )
