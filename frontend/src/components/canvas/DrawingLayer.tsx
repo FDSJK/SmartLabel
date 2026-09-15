@@ -146,12 +146,10 @@ export default function DrawingLayer() {
         }
         if (currentTool === 'freehand' && e.evt.button === 0) {
           const store = useEditorStore.getState();
-          // 已有未闭合曲线（松手后等待双击闭合）时不再新增点，
-          // 否则双击闭合的两次 mousedown 会误加孤立点。
-          if (store.drawingPoints !== null) {
-            return;
-          }
-          store.startDrawing();
+          // 多段自由绘制：松手后 drawingPoints 仍保留，再次按下会继续向同一条曲线
+          // 追加新的一段，直到点「✓ 闭合」按钮或右键闭合。仅当还没有任何点时才开始
+          // 一段全新绘制。
+          if (store.drawingPoints === null) store.startDrawing();
           store.addDrawingPoint(ix, iy);
           freehandActive.current = true;
           lastFreehandPoint.current = [ix, iy];
@@ -366,9 +364,8 @@ export default function DrawingLayer() {
   const handleDblClick = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
       // Double-click selection works in select / add / cut modes.
-      // 自由绘制的「双击闭合」改由容器级原生 dblclick 处理（见 KonvaStage），
-      // 不再走 Konva 合成的 dblclick——它按 mousedown/mouseup 计数，绘制松手时
-      // 已把双击窗口占用，导致下一次单击被误判为双击、行为不稳定。
+      // 自由绘制不再用双击闭合（改为「✓ 闭合」按钮 / 右键闭合），因为自由绘制支持
+      // 多段续画，双击的两次 mousedown 会误增两个孤立点。
       if (!isSelecting && !isAdding && !isCutting) return;
 
       const stage = e.target.getStage();
